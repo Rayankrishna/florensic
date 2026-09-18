@@ -1,0 +1,19 @@
+# Static analysis for The Plant Gram.
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - "**/*.g.dart"
+  errors:
+    # MobX stores are declared as `class Store = _Store with _$Store`, which the
+    # generator requires. The private base type is part of that contract.
+    library_private_types_in_public_api: ignore
+
+linter:
+  rules:
+    prefer_single_quotes: true
+    require_trailing_commas: false
+    avoid_print: true
+    prefer_const_constructors: true
+    prefer_const_declarations: true
+    unnecessary_underscores: false
