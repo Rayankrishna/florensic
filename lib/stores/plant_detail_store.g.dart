@@ -23,10 +23,10 @@ mixin _$PlantDetailStore on _PlantDetailStore, Store {
     () => super.healthScore,
     name: '_PlantDetailStore.healthScore',
   )).value;
-  Computed<HealthBand>? _$bandComputed;
+  Computed<HealthBand?>? _$bandComputed;
 
   @override
-  HealthBand get band => (_$bandComputed ??= Computed<HealthBand>(
+  HealthBand? get band => (_$bandComputed ??= Computed<HealthBand?>(
     () => super.band,
     name: '_PlantDetailStore.band',
   )).value;
@@ -44,12 +44,47 @@ mixin _$PlantDetailStore on _PlantDetailStore, Store {
     () => super.isPaused,
     name: '_PlantDetailStore.isPaused',
   )).value;
+  Computed<bool>? _$isStaleComputed;
+
+  @override
+  bool get isStale => (_$isStaleComputed ??= Computed<bool>(
+    () => super.isStale,
+    name: '_PlantDetailStore.isStale',
+  )).value;
+  Computed<bool>? _$isScoredComputed;
+
+  @override
+  bool get isScored => (_$isScoredComputed ??= Computed<bool>(
+    () => super.isScored,
+    name: '_PlantDetailStore.isScored',
+  )).value;
+  Computed<int?>? _$careScoreComputed;
+
+  @override
+  int? get careScore => (_$careScoreComputed ??= Computed<int?>(
+    () => super.careScore,
+    name: '_PlantDetailStore.careScore',
+  )).value;
+  Computed<Risk?>? _$riskComputed;
+
+  @override
+  Risk? get risk => (_$riskComputed ??= Computed<Risk?>(
+    () => super.risk,
+    name: '_PlantDetailStore.risk',
+  )).value;
   Computed<String>? _$bandLabelComputed;
 
   @override
   String get bandLabel => (_$bandLabelComputed ??= Computed<String>(
     () => super.bandLabel,
     name: '_PlantDetailStore.bandLabel',
+  )).value;
+  Computed<Course?>? _$openCourseComputed;
+
+  @override
+  Course? get openCourse => (_$openCourseComputed ??= Computed<Course?>(
+    () => super.openCourse,
+    name: '_PlantDetailStore.openCourse',
   )).value;
   Computed<int>? _$weeklyChangeComputed;
 
@@ -275,6 +310,42 @@ mixin _$PlantDetailStore on _PlantDetailStore, Store {
     });
   }
 
+  late final _$coursesAtom = Atom(
+    name: '_PlantDetailStore.courses',
+    context: context,
+  );
+
+  @override
+  ObservableList<Course> get courses {
+    _$coursesAtom.reportRead();
+    return super.courses;
+  }
+
+  @override
+  set courses(ObservableList<Course> value) {
+    _$coursesAtom.reportWrite(value, super.courses, () {
+      super.courses = value;
+    });
+  }
+
+  late final _$coursesLoadedAtom = Atom(
+    name: '_PlantDetailStore.coursesLoaded',
+    context: context,
+  );
+
+  @override
+  bool get coursesLoaded {
+    _$coursesLoadedAtom.reportRead();
+    return super.coursesLoaded;
+  }
+
+  @override
+  set coursesLoaded(bool value) {
+    _$coursesLoadedAtom.reportWrite(value, super.coursesLoaded, () {
+      super.coursesLoaded = value;
+    });
+  }
+
   late final _$environmentDetailAtom = Atom(
     name: '_PlantDetailStore.environmentDetail',
     context: context,
@@ -321,6 +392,36 @@ mixin _$PlantDetailStore on _PlantDetailStore, Store {
     return _$loadPlantDetailsAsyncAction.run(
       () => super.loadPlantDetails(plantId),
     );
+  }
+
+  late final _$loadCoursesAsyncAction = AsyncAction(
+    '_PlantDetailStore.loadCourses',
+    context: context,
+  );
+
+  @override
+  Future<void> loadCourses() {
+    return _$loadCoursesAsyncAction.run(() => super.loadCourses());
+  }
+
+  late final _$skipWateringAsyncAction = AsyncAction(
+    '_PlantDetailStore.skipWatering',
+    context: context,
+  );
+
+  @override
+  Future<bool> skipWatering(WateringSkipReason reason) {
+    return _$skipWateringAsyncAction.run(() => super.skipWatering(reason));
+  }
+
+  late final _$addNoteAsyncAction = AsyncAction(
+    '_PlantDetailStore.addNote',
+    context: context,
+  );
+
+  @override
+  Future<bool> addNote(List<NoteChip> chips, {String? text}) {
+    return _$addNoteAsyncAction.run(() => super.addNote(chips, text: text));
   }
 
   late final _$markAsWateredAsyncAction = AsyncAction(
@@ -397,6 +498,38 @@ mixin _$PlantDetailStore on _PlantDetailStore, Store {
   }
 
   @override
+  Future<bool> abandonProblem(
+    CourseProblem problem,
+    AbandonReason reason, {
+    String? note,
+  }) {
+    final _$actionInfo = _$_PlantDetailStoreActionController.startAction(
+      name: '_PlantDetailStore.abandonProblem',
+    );
+    try {
+      return super.abandonProblem(problem, reason, note: note);
+    } finally {
+      _$_PlantDetailStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  Future<bool> abandonCourse(
+    Course course,
+    AbandonReason reason, {
+    String? note,
+  }) {
+    final _$actionInfo = _$_PlantDetailStoreActionController.startAction(
+      name: '_PlantDetailStore.abandonCourse',
+    );
+    try {
+      return super.abandonCourse(course, reason, note: note);
+    } finally {
+      _$_PlantDetailStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
   void applyUpdatedPlant(Plant updated) {
     final _$actionInfo = _$_PlantDetailStoreActionController.startAction(
       name: '_PlantDetailStore.applyUpdatedPlant',
@@ -417,6 +550,8 @@ errorMessage: ${errorMessage},
 range: ${range},
 isBusy: ${isBusy},
 justWatered: ${justWatered},
+courses: ${courses},
+coursesLoaded: ${coursesLoaded},
 environmentDetail: ${environmentDetail},
 environmentStatus: ${environmentStatus},
 isLoading: ${isLoading},
@@ -424,7 +559,12 @@ healthScore: ${healthScore},
 band: ${band},
 careStatus: ${careStatus},
 isPaused: ${isPaused},
+isStale: ${isStale},
+isScored: ${isScored},
+careScore: ${careScore},
+risk: ${risk},
 bandLabel: ${bandLabel},
+openCourse: ${openCourse},
 weeklyChange: ${weeklyChange},
 streakWeeks: ${streakWeeks},
 updateCount: ${updateCount},

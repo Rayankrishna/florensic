@@ -2,8 +2,11 @@ import 'package:mobx/mobx.dart';
 
 import '../domain/models/plant.dart';
 import '../domain/models/plant_health.dart';
+import '../domain/models/treatment.dart';
 import '../domain/repositories/plant_repository.dart';
 import '../enum.dart';
+import '../interceptors/api_interceptor.dart';
+import '../utils/app_log.dart';
 import '../utils/date_format.dart';
 import 'plant_collection_store.dart';
 import '../utils/app_clock.dart';
@@ -48,8 +51,9 @@ abstract class _PlantDetailStore with Store {
   @computed
   int? get healthScore => plant?.healthScore;
 
+  /// Null when there is no band to show: never scored, or paused.
   @computed
-  HealthBand get band => HealthBandX.fromScore(plant?.healthScore);
+  HealthBand? get band => plant?.band;
 
   @computed
   CareStatus get careStatus => plant?.careStatus ?? CareStatus.active;
@@ -57,13 +61,44 @@ abstract class _PlantDetailStore with Store {
   @computed
   bool get isPaused => plant?.paused ?? false;
 
+  /// One missed check-in window: still under care, just not seen lately.
+  @computed
+  bool get isStale => plant?.stale ?? false;
+
+  @computed
+  bool get isScored => plant?.scored ?? false;
+
+  @computed
+  int? get careScore => plant?.careScore;
+
+  @computed
+  Risk? get risk => plant?.risk;
+
   @computed
   String get bandLabel => switch (band) {
         HealthBand.thriving => 'Looking good',
         HealthBand.watch => 'Needs attention',
         HealthBand.critical => 'Needs attention',
-        HealthBand.paused => 'Care status paused',
+        null => isPaused ? 'Care status paused' : 'Not scored yet',
       };
+
+  /// Every treatment plan the plant has had, newest first — one plan at a
+  /// time, problems worst first, steps in one order. Refetched after each
+  /// check-in because every check-in judges every open problem.
+  @observable
+  ObservableList<Course> courses = ObservableList<Course>();
+
+  @observable
+  bool coursesLoaded = false;
+
+  /// The plan in progress, if any.
+  @computed
+  Course? get openCourse {
+    for (final c in courses) {
+      if (c.isOpen) return c;
+    }
+    return null;
+  }
 
   @computed
   int get weeklyChange => plant?.weeklyChange ?? 0;
@@ -111,7 +146,9 @@ abstract class _PlantDetailStore with Store {
       kind: MetricKind.watering,
       label: 'Watering',
       value: 'On track',
-      detail: 'Last watered ${AppDate.relativeDays(p.daysSinceWatered)}',
+      detail: p.daysSinceWatered == null
+          ? 'No watering logged yet'
+          : 'Last watered ${AppDate.relativeDays(p.daysSinceWatered!)}',
       status: MetricStatus.good,
     );
   }
@@ -252,6 +289,22 @@ abstract class _PlantDetailStore with Store {
         tone: MetricStatus.neutral,
       );
     }
+    if (!p.scored) {
+      return const PlantInsight(
+        headline: 'Nothing has scored this plant yet.',
+        body: 'Add a condition photo and its health score starts from what '
+            'the picture shows.',
+        tone: MetricStatus.neutral,
+      );
+    }
+    if (p.stale) {
+      return const PlantInsight(
+        headline: 'We have not seen this one lately.',
+        body: 'Its last check-in window closed without a photo. The score '
+            'stands; a new check-in brings it back up to date.',
+        tone: MetricStatus.neutral,
+      );
+    }
     if (band == HealthBand.thriving) {
       return const PlantInsight(
         headline: 'Your plant is doing well.',
@@ -271,6 +324,7 @@ abstract class _PlantDetailStore with Store {
 
   @computed
   String get attentionHeadline {
+    if (isStale) return 'Not seen lately';
     final change = weeklyChange;
     if (change < 0) return 'Down ${-change} this week';
     if (change > 0) return 'Up $change this week';
@@ -282,6 +336,7 @@ abstract class _PlantDetailStore with Store {
     final p = plant;
     if (p == null) return '';
     final reasons = <String>[];
+    if (p.stale) reasons.add('a missed check-in window');
     if (p.leafDropReported) reasons.add('two reports of leaf drop');
     if (p.daysUntilWatering < 0) reasons.add('a missed watering');
     if (p.conditionDue) reasons.add('an overdue check-in');
@@ -358,19 +413,123 @@ abstract class _PlantDetailStore with Store {
     }
     try {
       await _collection.loadPlants();
-      plant = _collection.plantById(plantId);
-      state = plant == null ? LoadState.error : LoadState.ready;
-      if (plant == null) errorMessage = 'That plant is no longer in your collection.';
-    } catch (e) {
-      errorMessage = e.toString();
-      state = LoadState.error;
+    } catch (e, stack) {
+      AppLog.e('loading plant $plantId failed',
+          name: 'plants', error: e, stackTrace: stack);
+      runInAction(() {
+        errorMessage = e is ApiException ? e.message : e.toString();
+        state = LoadState.error;
+      });
+      return;
     }
+
+    final found = _collection.plantById(plantId);
+    runInAction(() {
+      plant = found;
+      state = found == null ? LoadState.error : LoadState.ready;
+      if (found == null) {
+        errorMessage = 'That plant is no longer in your collection.';
+      }
+    });
   }
 
   @action
   void attach(Plant value) {
     plant = value;
     state = LoadState.ready;
+    courses.clear();
+    coursesLoaded = false;
+  }
+
+  @action
+  Future<void> loadCourses() async {
+    final p = plant;
+    if (p == null) return;
+    try {
+      final list = await _repository.loadCourses(p.id);
+      runInAction(() {
+        courses = ObservableList<Course>.of(list);
+        coursesLoaded = true;
+      });
+    } catch (e, stack) {
+      AppLog.e('loading treatment plans failed',
+          name: 'plants', error: e, stackTrace: stack);
+      runInAction(() => coursesLoaded = true);
+    }
+  }
+
+  /// Stops one problem's course on the plan.
+  @action
+  Future<bool> abandonProblem(CourseProblem problem, AbandonReason reason,
+          {String? note}) =>
+      _stop(
+        'treatment ${problem.problem}',
+        () => _repository.abandonTreatment(problem.treatmentId, reason,
+            note: note),
+      );
+
+  /// Stops every open problem on the plan at once.
+  @action
+  Future<bool> abandonCourse(Course course, AbandonReason reason,
+          {String? note}) =>
+      _stop(
+        'plan ${course.id}',
+        () => _repository.abandonCourse(course.id, reason, note: note),
+      );
+
+  Future<bool> _stop(String what, Future<void> Function() call) async {
+    if (isBusy) return false;
+    runInAction(() => isBusy = true);
+    try {
+      await call();
+      AppLog.i('stopped $what', name: 'plants');
+      // Its steps have left today's list and the check-in cadence went back.
+      await _collection.refreshTodaysCare();
+      await loadCourses();
+      return true;
+    } catch (e, stack) {
+      AppLog.e('stopping $what failed',
+          name: 'plants', error: e, stackTrace: stack);
+      runInAction(
+          () => errorMessage = e is ApiException ? e.message : e.toString());
+      // It may already be closed; show what the server has.
+      await loadCourses();
+      return false;
+    } finally {
+      runInAction(() => isBusy = false);
+    }
+  }
+
+  @action
+  Future<bool> skipWatering(WateringSkipReason reason) async {
+    final p = plant;
+    if (p == null || isBusy) return false;
+    isBusy = true;
+    try {
+      final updated = await _collection.skipWatering(p.id, reason);
+      if (updated != null) {
+        runInAction(() => plant = updated.keepingRiskOf(p));
+      }
+      return updated != null;
+    } finally {
+      runInAction(() => isBusy = false);
+    }
+  }
+
+  @action
+  Future<bool> addNote(List<NoteChip> chips, {String? text}) async {
+    final p = plant;
+    if (p == null || isBusy) return false;
+    isBusy = true;
+    try {
+      final updated = await _collection.addNote(p.id, chips, text: text);
+      if (updated != null) {
+        runInAction(() => plant = updated.keepingRiskOf(p));
+      }
+      return updated != null;
+    } finally {
+      runInAction(() => isBusy = false);
+    }
   }
 
   @action
@@ -381,30 +540,42 @@ abstract class _PlantDetailStore with Store {
     try {
       final updated = await _collection.markAsWatered(p.id);
       if (updated != null) {
-        plant = updated;
-        justWatered = true;
+        runInAction(() {
+          // The score does not move on a watering, and the response does not
+          // compute risk, so the one on screen stays.
+          plant = updated.keepingRiskOf(p);
+          justWatered = true;
+        });
         Future<void>.delayed(const Duration(seconds: 2), () {
-          justWatered = false;
+          runInAction(() => justWatered = false);
         });
       }
     } finally {
-      isBusy = false;
+      runInAction(() => isBusy = false);
     }
   }
 
+  /// Paused plants only — a stale plant comes back through a check-in, and
+  /// the server answers `409 plant_not_paused` to say so.
   @action
   Future<void> resumeActiveCare() async {
     final p = plant;
-    if (p == null || isBusy) return;
+    if (p == null || isBusy || !p.paused) return;
     isBusy = true;
     try {
       final updated = await _repository.resumeActiveCare(p.id);
-      plant = updated;
-      _collection.replacePlant(updated);
-    } catch (e) {
-      errorMessage = e.toString();
+      AppLog.i('resumed care for ${updated.nickname}', name: 'plants');
+      runInAction(() {
+        plant = updated;
+        _collection.replacePlant(updated);
+      });
+    } catch (e, stack) {
+      AppLog.e('resuming care failed',
+          name: 'plants', error: e, stackTrace: stack);
+      runInAction(
+          () => errorMessage = e is ApiException ? e.message : e.toString());
     } finally {
-      isBusy = false;
+      runInAction(() => isBusy = false);
     }
   }
 
@@ -414,15 +585,20 @@ abstract class _PlantDetailStore with Store {
     if (p == null) return;
     final updated =
         await _repository.setReminder(p.id, watering: watering, checkIn: checkIn);
-    plant = updated;
-    _collection.replacePlant(updated);
+    runInAction(() {
+      plant = updated.keepingRiskOf(p);
+      _collection.replacePlant(updated);
+    });
   }
 
-  /// Called by the condition-update flow once a new update is saved.
+  /// Called by the condition-update flow once a new update is saved. The
+  /// check-in judged every open problem and may have added one to the plan,
+  /// so the plans are refetched.
   @action
   void applyUpdatedPlant(Plant updated) {
     plant = updated;
     _collection.replacePlant(updated);
+    loadCourses();
   }
 
   static DateTime _stripTime(DateTime d) => DateTime(d.year, d.month, d.day);

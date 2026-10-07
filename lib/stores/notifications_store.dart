@@ -3,6 +3,8 @@ import 'package:mobx/mobx.dart';
 import '../domain/models/notification_item.dart';
 import '../domain/repositories/notifications_repository.dart';
 import '../enum.dart';
+import '../interceptors/api_interceptor.dart';
+import '../utils/app_log.dart';
 
 part 'notifications_store.g.dart';
 
@@ -65,14 +67,24 @@ abstract class _NotificationsStore with Store {
     if (!force && state == LoadState.ready) return;
     state = LoadState.loading;
     errorMessage = null;
+
+    List<AppNotification> resp;
     try {
-      final result = await _repository.loadNotifications();
-      items = ObservableList<AppNotification>.of(result);
-      state = LoadState.ready;
-    } catch (e) {
-      errorMessage = e.toString();
-      state = LoadState.error;
+      resp = await _repository.loadNotifications();
+    } catch (e, stack) {
+      AppLog.e('loading notifications failed',
+          name: 'notifications', error: e, stackTrace: stack);
+      runInAction(() {
+        errorMessage = e is ApiException ? e.message : e.toString();
+        if (items.isEmpty) state = LoadState.error;
+      });
+      return;
     }
+
+    runInAction(() {
+      items = ObservableList<AppNotification>.of(resp);
+      state = LoadState.ready;
+    });
   }
 
   @action

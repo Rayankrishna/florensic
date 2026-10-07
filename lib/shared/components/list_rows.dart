@@ -210,9 +210,19 @@ class TimelineRow extends StatelessWidget {
 
   Color get _nodeColor => switch (type) {
         CareEventType.watered => AppColors.water,
-        CareEventType.conditionUpdate => AppColors.leaf,
+        CareEventType.wateringSkipped => AppColors.waterDeep,
+        CareEventType.conditionUpdate ||
+        CareEventType.added ||
+        CareEventType.resumed =>
+          AppColors.leaf,
+        CareEventType.checkInMissed => AppColors.critical,
+        CareEventType.treatment => AppColors.caution,
+        CareEventType.note => AppColors.healthyDeep,
         CareEventType.repotted => AppColors.caution,
-        CareEventType.moved => AppColors.inkFaint,
+        CareEventType.speciesCorrected ||
+        CareEventType.moved ||
+        CareEventType.other =>
+          AppColors.inkFaint,
       };
 
   @override

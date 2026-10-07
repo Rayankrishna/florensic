@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../domain/models/plant.dart';
+import '../../domain/models/plant_health.dart';
+import '../../domain/models/treatment.dart';
 import '../../enum.dart';
 import '../../locator.dart';
 import '../../shared/components/app_button.dart';
@@ -58,9 +60,10 @@ class FullHealthCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.xl),
+          // The score is what the photographs showed. Watering, the weather
+          // and the keeper's own verdict do not move it.
           Text(
-            'Based on recent condition updates, care activity, and '
-            'environmental conditions.',
+            'Based on what your condition photos showed.',
             textAlign: TextAlign.center,
             style: AppText.body15.copyWith(fontSize: 15),
           ),
@@ -149,7 +152,8 @@ class AttentionHealthCard extends StatelessWidget {
   }
 }
 
-/// The paused card: the score is held, not estimated.
+/// The paused card. The plant keeps the last number anybody knew; only the
+/// band goes away, so the ring is beaded and the score sits under it.
 class PausedHealthCard extends StatelessWidget {
   const PausedHealthCard({super.key, required this.plant});
 
@@ -157,6 +161,7 @@ class PausedHealthCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final score = plant.healthScore;
     return AppCard(
       padding: const EdgeInsets.fromLTRB(AppSpacing.cardPaddingLarge,
           AppSpacing.xxxl, AppSpacing.cardPaddingLarge, AppSpacing.xxxl),
@@ -174,6 +179,12 @@ class PausedHealthCard extends StatelessWidget {
                 Text('PAUSED',
                     style: AppText.caption12
                         .copyWith(fontSize: 12, letterSpacing: 2.2)),
+                if (score != null) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  Text('Last score $score',
+                      style: AppText.label13.copyWith(
+                          fontSize: 13, color: AppColors.inkMuted)),
+                ],
               ],
             ),
           ),
@@ -181,13 +192,271 @@ class PausedHealthCard extends StatelessWidget {
           const TagPill(label: 'Care status paused', tone: MetricStatus.neutral),
           const SizedBox(height: AppSpacing.lg),
           Text(
-            'Your scheduled condition update was missed. Add a new update to '
-            'resume active care — your history and streak are kept.',
+            'Two condition update windows passed without a photo. Resume '
+            'active care and add an update — your history, score and streak '
+            'are kept.',
             textAlign: TextAlign.center,
             style: AppText.body15.copyWith(fontSize: 15),
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Nothing has scored the plant yet: `health_score` is null and so is the
+/// band. Not a 0, and not paused.
+class UnscoredHealthCard extends StatelessWidget {
+  const UnscoredHealthCard({super.key, required this.onUpdate});
+
+  final VoidCallback onUpdate;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: const EdgeInsets.fromLTRB(AppSpacing.cardPaddingLarge,
+          AppSpacing.xxxl, AppSpacing.cardPaddingLarge, AppSpacing.xxxl),
+      child: Column(
+        children: [
+          HealthRing(
+            score: null,
+            size: 214,
+            strokeWidth: 15,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const PgIcon(PgIcons.camera,
+                    size: 34, color: AppColors.inkMuted),
+                const SizedBox(height: AppSpacing.sm),
+                Text('NOT SCORED YET',
+                    style: AppText.caption12
+                        .copyWith(fontSize: 12, letterSpacing: 2.0)),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          Text(
+            'The health score starts from what your first condition photo '
+            'shows.',
+            textAlign: TextAlign.center,
+            style: AppText.body15.copyWith(fontSize: 15),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          AppButton.dark(
+            label: 'Add the first photo',
+            icon: PgIcons.camera,
+            height: 50,
+            fontSize: 15,
+            onPressed: onUpdate,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One missed check-in window: the score stands and care carries on, but
+/// nothing current is known. A check-in, not a resume, brings it back.
+class StaleNotice extends StatelessWidget {
+  const StaleNotice({super.key, required this.onCheckIn});
+
+  final VoidCallback onCheckIn;
+
+  @override
+  Widget build(BuildContext context) {
+    return SoftCard(
+      color: AppColors.cautionTint,
+      padding: const EdgeInsets.all(AppSpacing.cardPadding),
+      child: Row(
+        children: [
+          const IconTile(
+              icon: PgIcons.eyeOff, tone: MetricStatus.watch, size: 48),
+          const SizedBox(width: AppSpacing.lg),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('We have not seen this one lately',
+                    style: AppText.heading17.copyWith(fontSize: 16.5)),
+                const SizedBox(height: 3),
+                Text(
+                  'Its last check-in window closed without a photo. One more '
+                  'missed window pauses it.',
+                  style: AppText.body13
+                      .copyWith(fontSize: 14, color: AppColors.cautionDeep),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          CircleIconButton(
+            icon: PgIcons.camera,
+            size: 46,
+            background: AppColors.ink,
+            foreground: AppColors.leaf,
+            elevated: false,
+            onPressed: onCheckIn,
+            semanticLabel: 'Check in now',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The coming week, when the server rated it anything but low. The reasons
+/// are the server's own phrases, printed as they are.
+class RiskBanner extends StatelessWidget {
+  const RiskBanner({super.key, required this.risk});
+
+  final Risk risk;
+
+  @override
+  Widget build(BuildContext context) {
+    final high = risk.level == RiskLevel.high;
+    return SoftCard(
+      color: high ? AppColors.criticalTint : AppColors.cautionTint,
+      padding: const EdgeInsets.all(AppSpacing.cardPadding),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              PgIcon(PgIcons.alertTriangle,
+                  size: 20,
+                  color: high ? AppColors.criticalDeep : AppColors.cautionDeep),
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                high ? 'High risk this week' : 'Worth watching this week',
+                style: AppText.heading17.copyWith(fontSize: 16.5),
+              ),
+            ],
+          ),
+          if (risk.reasons.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.md),
+            for (final reason in risk.reasons)
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(top: 7),
+                      child: Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: high
+                              ? AppColors.criticalDeep
+                              : AppColors.cautionDeep,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm + 2),
+                    Expanded(
+                      child: Text(reason,
+                          style: AppText.body15Ink.copyWith(fontSize: 15)),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// The keeper's side of the ledger: how much of the care that was due over
+/// the last 30 days was given on time. Sits beside health, not instead of it.
+class CareScoreTile extends StatelessWidget {
+  const CareScoreTile({super.key, required this.careScore});
+
+  final int careScore;
+
+  @override
+  Widget build(BuildContext context) {
+    final tone = careScore >= 80
+        ? MetricStatus.good
+        : careScore >= 50
+            ? MetricStatus.watch
+            : MetricStatus.bad;
+    return AppCard(
+      padding: const EdgeInsets.all(AppSpacing.cardPadding),
+      child: Row(
+        children: [
+          IconTile(icon: PgIcons.check, tone: tone, size: 52),
+          const SizedBox(width: AppSpacing.lg),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Care given on time',
+                    style: AppText.heading17.copyWith(fontSize: 16.5)),
+                const SizedBox(height: 3),
+                Text(
+                  careScore == 100
+                      ? 'Everything that was due in the last 30 days'
+                      : 'Of what was due in the last 30 days',
+                  style: AppText.body13.copyWith(fontSize: 14),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Text('$careScore%',
+              style: AppText.metric.copyWith(fontSize: 26)),
+        ],
+      ),
+    );
+  }
+}
+
+/// A one-row summary of the plant's open treatment plan, leading to it.
+class TreatmentsSummaryCard extends StatelessWidget {
+  const TreatmentsSummaryCard({
+    super.key,
+    required this.course,
+    required this.loaded,
+    required this.onOpen,
+  });
+
+  /// The plan in progress, if any.
+  final Course? course;
+  final bool loaded;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final String title;
+    final String detail;
+    final open = course?.openProblems ?? const [];
+    if (!loaded) {
+      title = 'Treatment plan';
+      detail = 'Loading…';
+    } else if (course == null || open.isEmpty) {
+      title = 'Nothing to treat';
+      detail = 'A plan opens on its own when a photo shows a problem';
+    } else if (open.length == 1) {
+      title = 'Treating ${open.first.problem.toLowerCase()}';
+      detail = open.first.statusLabel;
+    } else {
+      title = 'Treating ${open.length} problems';
+      detail = open.map((p) => p.problem).join(' · ');
+    }
+    return TileRow(
+      icon: PgIcons.leaf,
+      title: title,
+      detail: detail,
+      tone: open.isEmpty
+          ? MetricStatus.neutral
+          : course!.severity == ProblemSeverity.high
+              ? MetricStatus.bad
+              : MetricStatus.watch,
+      trailing: const PgIcon(PgIcons.chevronRight,
+          size: 20, color: AppColors.inkMuted),
+      onTap: onOpen,
     );
   }
 }

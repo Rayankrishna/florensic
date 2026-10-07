@@ -14,6 +14,7 @@ import 'screens/plants/care_schedule_screen.dart';
 import 'screens/plants/condition_confirmed_screen.dart';
 import 'screens/plants/condition_update_screen.dart';
 import 'screens/plants/plant_detail_screen.dart';
+import 'screens/plants/treatments_screen.dart';
 import 'screens/pokedex/pokedex_screen.dart';
 import 'screens/pokedex/species_detail_screen.dart';
 import 'screens/scanning/scan_result_screen.dart';
@@ -21,6 +22,7 @@ import 'screens/scanning/scan_screen.dart';
 import 'screens/shell/app_shell.dart';
 import 'screens/splash/splash_screen.dart';
 import 'stores/condition_update_store.dart';
+import 'stores/plant_detail_store.dart';
 import 'theme.dart';
 import 'utils/page_transitions.dart';
 
@@ -43,6 +45,7 @@ class AppRoutes {
   static const String careSchedule = '/plant/schedule';
   static const String conditionUpdate = '/plant/condition';
   static const String conditionConfirmed = '/plant/condition/done';
+  static const String treatments = '/plant/treatments';
   static const String pokedex = '/pokedex';
   static const String speciesDetail = '/pokedex/species';
   static const String scan = '/scan';
@@ -99,6 +102,13 @@ class AppRoutes {
       case conditionConfirmed:
         return AppTransitions.bloom(
           ConditionConfirmedScreen(store: args! as ConditionUpdateStore),
+          settings,
+        );
+
+      // Shares the detail screen's store so the list it just loaded is reused.
+      case treatments:
+        return AppTransitions.glide(
+          TreatmentsScreen(store: args! as PlantDetailStore),
           settings,
         );
 

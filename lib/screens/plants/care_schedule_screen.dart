@@ -121,11 +121,14 @@ class _CareScheduleScreenState extends State<CareScheduleScreen> {
                         children: [
                           _FactCard(
                             label: 'Last watered',
-                            value: AppDate.relativeDays(plant.daysSinceWatered)
-                                .replaceFirst('t', 'T'),
-                            detail:
-                                '${AppDate.weekdayDayMonth(schedule.lastWatered)}'
-                                ' · ${schedule.lastAmountMl} ml',
+                            value: plant.daysSinceWatered == null
+                                ? 'Not yet'
+                                : AppDate.relativeDays(plant.daysSinceWatered!)
+                                    .replaceFirst('t', 'T'),
+                            detail: schedule.lastWatered == null
+                                ? 'No watering logged'
+                                : '${AppDate.weekdayDayMonth(schedule.lastWatered!)}'
+                                    ' · ${schedule.lastAmountMl} ml',
                           ),
                           _FactCard(
                             label: 'Frequency',
@@ -200,7 +203,8 @@ class _CareScheduleScreenState extends State<CareScheduleScreen> {
                                     '${AppDate.dayMonth(schedule.checkInWindowOpens)}–'
                                     '${AppDate.dayMonth(schedule.checkInWindowOpens.add(Duration(days: schedule.checkInWindowDays)))}'
                                     ' to keep care status active. Miss it and '
-                                    'the status simply pauses — nothing is lost.',
+                                    'the plant goes quiet; miss a second and it '
+                                    'pauses — nothing is lost.',
                                     style: AppText.body13.copyWith(
                                         fontSize: 14,
                                         color: AppColors.cautionDeep),
@@ -216,7 +220,7 @@ class _CareScheduleScreenState extends State<CareScheduleScreen> {
                       const SizedBox(height: AppSpacing.xl),
                       for (var i = 0; i < plant.careHistory.length; i++)
                         TimelineRow(
-                          title: plant.careHistory[i].title,
+                          title: plant.careHistory[i].label,
                           detail: '${AppDate.eventStamp(plant.careHistory[i].at)}'
                               '${plant.careHistory[i].detail.isEmpty ? '' : ' · ${plant.careHistory[i].detail}'}',
                           type: plant.careHistory[i].type,
@@ -356,7 +360,8 @@ class _CalendarCard extends StatelessWidget {
                       day: day,
                       isToday: AppDate.sameDay(day, today),
                       isWatering: AppDate.sameDay(day, schedule.nextWatering),
-                      isWatered: AppDate.sameDay(day, schedule.lastWatered),
+                      isWatered: schedule.lastWatered != null &&
+                          AppDate.sameDay(day, schedule.lastWatered!),
                       isCheckIn: !day.isBefore(_strip(schedule.checkInWindowOpens)) &&
                           !day.isAfter(_strip(schedule.checkInWindowOpens)
                               .add(Duration(days: schedule.checkInWindowDays))),

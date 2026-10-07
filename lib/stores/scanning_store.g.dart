@@ -89,24 +89,6 @@ mixin _$ScanningStore on _ScanningStore, Store {
     });
   }
 
-  late final _$torchOnAtom = Atom(
-    name: '_ScanningStore.torchOn',
-    context: context,
-  );
-
-  @override
-  bool get torchOn {
-    _$torchOnAtom.reportRead();
-    return super.torchOn;
-  }
-
-  @override
-  set torchOn(bool value) {
-    _$torchOnAtom.reportWrite(value, super.torchOn, () {
-      super.torchOn = value;
-    });
-  }
-
   late final _$resultAtom = Atom(
     name: '_ScanningStore.result',
     context: context,
@@ -161,6 +143,60 @@ mixin _$ScanningStore on _ScanningStore, Store {
     });
   }
 
+  late final _$captureAtom = Atom(
+    name: '_ScanningStore.capture',
+    context: context,
+  );
+
+  @override
+  Capture? get capture {
+    _$captureAtom.reportRead();
+    return super.capture;
+  }
+
+  @override
+  set capture(Capture? value) {
+    _$captureAtom.reportWrite(value, super.capture, () {
+      super.capture = value;
+    });
+  }
+
+  late final _$isCapturingAtom = Atom(
+    name: '_ScanningStore.isCapturing',
+    context: context,
+  );
+
+  @override
+  bool get isCapturing {
+    _$isCapturingAtom.reportRead();
+    return super.isCapturing;
+  }
+
+  @override
+  set isCapturing(bool value) {
+    _$isCapturingAtom.reportWrite(value, super.isCapturing, () {
+      super.isCapturing = value;
+    });
+  }
+
+  late final _$needsSettingsAtom = Atom(
+    name: '_ScanningStore.needsSettings',
+    context: context,
+  );
+
+  @override
+  bool get needsSettings {
+    _$needsSettingsAtom.reportRead();
+    return super.needsSettings;
+  }
+
+  @override
+  set needsSettings(bool value) {
+    _$needsSettingsAtom.reportWrite(value, super.needsSettings, () {
+      super.needsSettings = value;
+    });
+  }
+
   late final _$scanPlantAsyncAction = AsyncAction(
     '_ScanningStore.scanPlant',
     context: context,
@@ -171,6 +207,16 @@ mixin _$ScanningStore on _ScanningStore, Store {
     return _$scanPlantAsyncAction.run(() => super.scanPlant());
   }
 
+  late final _$identifyPhotoAsyncAction = AsyncAction(
+    '_ScanningStore.identifyPhoto',
+    context: context,
+  );
+
+  @override
+  Future<void> identifyPhoto(File file) {
+    return _$identifyPhotoAsyncAction.run(() => super.identifyPhoto(file));
+  }
+
   late final _$selectImageAsyncAction = AsyncAction(
     '_ScanningStore.selectImage',
     context: context,
@@ -179,6 +225,28 @@ mixin _$ScanningStore on _ScanningStore, Store {
   @override
   Future<void> selectImage() {
     return _$selectImageAsyncAction.run(() => super.selectImage());
+  }
+
+  late final _$_takePhotoAsyncAction = AsyncAction(
+    '_ScanningStore._takePhoto',
+    context: context,
+  );
+
+  @override
+  Future<Capture?> _takePhoto({required bool fromCamera}) {
+    return _$_takePhotoAsyncAction.run(
+      () => super._takePhoto(fromCamera: fromCamera),
+    );
+  }
+
+  late final _$_identifyAsyncAction = AsyncAction(
+    '_ScanningStore._identify',
+    context: context,
+  );
+
+  @override
+  Future<void> _identify() {
+    return _$_identifyAsyncAction.run(() => super._identify());
   }
 
   late final _$addToCollectionAsyncAction = AsyncAction(
@@ -211,18 +279,6 @@ mixin _$ScanningStore on _ScanningStore, Store {
   }
 
   @override
-  void toggleTorch() {
-    final _$actionInfo = _$_ScanningStoreActionController.startAction(
-      name: '_ScanningStore.toggleTorch',
-    );
-    try {
-      return super.toggleTorch();
-    } finally {
-      _$_ScanningStoreActionController.endAction(_$actionInfo);
-    }
-  }
-
-  @override
   void resetScan() {
     final _$actionInfo = _$_ScanningStoreActionController.startAction(
       name: '_ScanningStore.resetScan',
@@ -235,24 +291,12 @@ mixin _$ScanningStore on _ScanningStore, Store {
   }
 
   @override
-  void simulateOffline(bool value) {
+  Future<void> openSettings() {
     final _$actionInfo = _$_ScanningStoreActionController.startAction(
-      name: '_ScanningStore.simulateOffline',
+      name: '_ScanningStore.openSettings',
     );
     try {
-      return super.simulateOffline(value);
-    } finally {
-      _$_ScanningStoreActionController.endAction(_$actionInfo);
-    }
-  }
-
-  @override
-  void simulateNoMatch(bool value) {
-    final _$actionInfo = _$_ScanningStoreActionController.startAction(
-      name: '_ScanningStore.simulateNoMatch',
-    );
-    try {
-      return super.simulateNoMatch(value);
+      return super.openSettings();
     } finally {
       _$_ScanningStoreActionController.endAction(_$actionInfo);
     }
@@ -263,10 +307,12 @@ mixin _$ScanningStore on _ScanningStore, Store {
     return '''
 status: ${status},
 target: ${target},
-torchOn: ${torchOn},
 result: ${result},
 errorMessage: ${errorMessage},
 isAdding: ${isAdding},
+capture: ${capture},
+isCapturing: ${isCapturing},
+needsSettings: ${needsSettings},
 isScanning: ${isScanning},
 hasMatch: ${hasMatch},
 confidence: ${confidence},

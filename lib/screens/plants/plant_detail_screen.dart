@@ -3,12 +3,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 
 import '../../domain/models/plant.dart';
+import '../../domain/models/plant_health.dart';
 import '../../enum.dart';
 import '../../locator.dart';
 import '../../routes.dart';
 import '../../shared/components/app_button.dart';
 import '../../shared/components/app_surfaces.dart';
 import '../../shared/components/app_toast.dart';
+import '../../shared/components/care_sheets.dart';
 import '../../shared/components/headers.dart';
 import '../../shared/components/list_rows.dart';
 import '../../shared/components/metric_card.dart';
@@ -23,9 +25,9 @@ import 'plant_detail_sections.dart';
 
 /// The plant health dashboard.
 ///
-/// One screen, three states: an active plant with a full score card, a plant
-/// that needs attention with a compact score and a coral insight, and a paused
-/// plant whose score is held rather than estimated.
+/// One screen, several states: a thriving plant with a full score card, one
+/// that needs attention (or has gone quiet) with a compact score, one nothing
+/// has scored yet, and a paused plant whose last score is held.
 class PlantDetailScreen extends StatefulWidget {
   const PlantDetailScreen({super.key, required this.plant});
 
@@ -49,12 +51,14 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
         insights.environmentStatus,
       );
     }
+    _store.loadCourses();
   }
 
   Future<void> _water() async {
     await _store.markAsWatered();
     if (!mounted) return;
     HapticFeedback.mediumImpact();
+    // Watering is care given; it moves the schedule, never the score.
     AppToast.show(
       context,
       message: 'Marked as watered',
@@ -63,6 +67,45 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
           '${AppDate.weekdayDayMonth(_store.plant!.schedule.nextWatering)}',
     );
   }
+
+  Future<void> _skipWater() async {
+    final skipped = await showWaterSkipSheet(
+      context,
+      onSkip: _store.skipWatering,
+    );
+    if (!mounted) return;
+    if (skipped) {
+      AppToast.show(
+        context,
+        message: 'Watering skipped',
+        detail: 'Next watering '
+            '${AppDate.weekdayDayMonth(_store.plant!.schedule.nextWatering)}',
+      );
+    } else if (_store.errorMessage != null) {
+      AppToast.show(context, message: _store.errorMessage!);
+    }
+  }
+
+  Future<void> _addNote() async {
+    final saved = await showQuickNoteSheet(
+      context,
+      onSave: (chips, text) => _store.addNote(chips, text: text),
+    );
+    if (!mounted) return;
+    if (saved) {
+      AppToast.show(
+        context,
+        message: 'Note saved',
+        detail: 'Next check-in opens '
+            '${AppDate.weekdayDayMonth(_store.plant!.schedule.checkInWindowOpens)}',
+      );
+    } else if (_store.errorMessage != null) {
+      AppToast.show(context, message: _store.errorMessage!);
+    }
+  }
+
+  void _checkIn(Plant plant) => Navigator.of(context)
+      .pushNamed(AppRoutes.conditionUpdate, arguments: plant);
 
   @override
   Widget build(BuildContext context) {
@@ -114,18 +157,48 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                           ),
                           sliver: SliverList.list(
                             children: [
+                              // Branch on care status for paused; a null
+                              // score means never scored, not paused.
                               if (_store.isPaused)
                                 PausedHealthCard(plant: plant)
-                              else if (_store.band == HealthBand.thriving)
+                              else if (!_store.isScored)
+                                UnscoredHealthCard(
+                                    onUpdate: () => _checkIn(plant))
+                              else if (_store.band == HealthBand.thriving &&
+                                  !_store.isStale)
                                 FullHealthCard(store: _store)
                               else
                                 AttentionHealthCard(store: _store),
+                              if (_store.isStale) ...[
+                                const SizedBox(height: AppSpacing.lg),
+                                StaleNotice(onCheckIn: () => _checkIn(plant)),
+                              ],
+                              // Risk only arrives on the detail read and a
+                              // check-in; a null here means not computed.
+                              if (!_store.isPaused &&
+                                  _store.risk != null &&
+                                  _store.risk!.level != RiskLevel.low) ...[
+                                const SizedBox(height: AppSpacing.lg),
+                                RiskBanner(risk: _store.risk!),
+                              ],
                               if (_store.isPaused) ...[
                                 const SizedBox(height: AppSpacing.lg),
-                                const WhatStillWorksCard(),
+                                WhatStillWorksCard(photoCount: plant.photoCount),
                                 const SizedBox(height: AppSpacing.lg),
                                 const UnavailableTrendCard(),
                               ] else ...[
+                                if (_store.careScore != null) ...[
+                                  const SizedBox(height: AppSpacing.lg),
+                                  CareScoreTile(careScore: _store.careScore!),
+                                ],
+                                const SizedBox(height: AppSpacing.lg),
+                                TreatmentsSummaryCard(
+                                  course: _store.openCourse,
+                                  loaded: _store.coursesLoaded,
+                                  onOpen: () => Navigator.of(context).pushNamed(
+                                      AppRoutes.treatments,
+                                      arguments: _store),
+                                ),
                                 const SizedBox(height: AppSpacing.lg),
                                 _MetricGrid(store: _store),
                                 const SizedBox(height: AppSpacing.lg),
@@ -150,7 +223,7 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                         SliverToBoxAdapter(
                           child: SizedBox(
                             height:
-                                110 + MediaQuery.viewPaddingOf(context).bottom,
+                                156 + MediaQuery.viewPaddingOf(context).bottom,
                           ),
                         ),
                       ],
@@ -162,10 +235,10 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                       paused: _store.isPaused,
                       busy: _store.isBusy,
                       justWatered: _store.justWatered,
-                      onUpdate: () => Navigator.of(
-                        context,
-                      ).pushNamed(AppRoutes.conditionUpdate, arguments: plant),
+                      onUpdate: () => _checkIn(plant),
                       onWater: _water,
+                      onSkipWater: _skipWater,
+                      onNote: _addNote,
                       onResume: () async {
                         await _store.resumeActiveCare();
                         if (!context.mounted) return;
@@ -462,6 +535,8 @@ class _ActionBar extends StatelessWidget {
     required this.justWatered,
     required this.onUpdate,
     required this.onWater,
+    required this.onSkipWater,
+    required this.onNote,
     required this.onResume,
   });
 
@@ -470,6 +545,8 @@ class _ActionBar extends StatelessWidget {
   final bool justWatered;
   final VoidCallback onUpdate;
   final VoidCallback onWater;
+  final VoidCallback onSkipWater;
+  final VoidCallback onNote;
   final VoidCallback onResume;
 
   @override
@@ -489,31 +566,61 @@ class _ActionBar extends StatelessWidget {
           stops: [0, 0.45, 1],
         ),
       ),
+      // Resume is only for a paused plant; a stale one comes back by being
+      // checked in on, which is the first button below.
       child: paused
           ? AppButton.primary(
               label: 'Resume active care',
               loading: busy,
               onPressed: onResume,
             )
-          : Row(
+          : Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Expanded(
-                  child: AppButton.dark(
-                    label: 'Update condition',
-                    onPressed: onUpdate,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    AppButton(
+                      label: 'Add a note',
+                      style: AppButtonStyle.link,
+                      expand: false,
+                      fontSize: 14.5,
+                      height: 36,
+                      onPressed: busy ? null : onNote,
+                    ),
+                    const SizedBox(width: AppSpacing.xl),
+                    AppButton(
+                      label: 'Skip watering',
+                      style: AppButtonStyle.link,
+                      expand: false,
+                      fontSize: 14.5,
+                      height: 36,
+                      onPressed: busy ? null : onSkipWater,
+                    ),
+                  ],
                 ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: AppButton(
-                    label: justWatered ? 'Watered' : 'Mark as watered',
-                    style: justWatered
-                        ? AppButtonStyle.soft
-                        : AppButtonStyle.primary,
-                    icon: justWatered ? PgIcons.check : null,
-                    loading: busy,
-                    onPressed: onWater,
-                  ),
+                const SizedBox(height: AppSpacing.sm),
+                Row(
+                  children: [
+                    Expanded(
+                      child: AppButton.dark(
+                        label: 'Update condition',
+                        onPressed: onUpdate,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: AppButton(
+                        label: justWatered ? 'Watered' : 'Mark as watered',
+                        style: justWatered
+                            ? AppButtonStyle.soft
+                            : AppButtonStyle.primary,
+                        icon: justWatered ? PgIcons.check : null,
+                        loading: busy,
+                        onPressed: onWater,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

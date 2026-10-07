@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'locator.dart';
 import 'routes.dart';
 import 'theme.dart';
+import 'utils/ui_scale.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,17 +31,16 @@ class PlantGramApp extends StatelessWidget {
       builder: (context, child) {
         // Cap text scaling so cards keep their designed proportions while
         // still honouring the reader's preference.
-        final scaler = MediaQuery.textScalerOf(context).clamp(
-          minScaleFactor: 0.9,
-          maxScaleFactor: 1.25,
-        );
-        return SafeArea(
-          bottom: true,
-          top: false,
-          
+        final scaler = MediaQuery.textScalerOf(
+          context,
+        ).clamp(minScaleFactor: 0.9, maxScaleFactor: 1.25);
+        return UiScale(
           child: MediaQuery(
             data: MediaQuery.of(context).copyWith(textScaler: scaler),
-            child: child ?? const SizedBox.shrink(),
+            child: SafeArea(
+              top: false,
+              child: child ?? const SizedBox.shrink(),
+            ),
           ),
         );
       },

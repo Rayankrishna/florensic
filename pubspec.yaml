@@ -22,6 +22,19 @@ dependencies:
 
   # Local persistence
   shared_preferences: ^2.3.3
+  flutter_secure_storage: ^9.2.2
+
+  # Networking
+  dio: ^5.7.0
+
+  # Camera, gallery and location for scanning / check-ins
+  camera: ^0.12.1
+  image_picker: ^1.1.2
+  permission_handler: ^11.3.1
+  geolocator: ^13.0.1
+
+  # The device's IANA zone, sent to PATCH /v1/me so "today" is the owner's day
+  flutter_timezone: ^5.1.1
 
 dev_dependencies:
   flutter_test:

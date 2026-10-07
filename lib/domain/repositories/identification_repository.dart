@@ -1,6 +1,4 @@
 import '../models/plant_species.dart';
-import 'mock/mock_api_client.dart';
-import 'mock/mock_species.dart';
 
 /// The result of an identification attempt.
 class IdentificationResult {
@@ -40,54 +38,11 @@ class IdentificationAlternative {
 
 /// Plant identification.
 ///
-/// No image recognition runs here. The mock returns a scripted match so the
-/// flow, its confidence display and its failure states can be exercised;
-/// wire a real vision service into a second implementation.
+/// Implementations upload the capture and wait for the analysis job, which
+/// is where the recognition actually happens (`POST /v1/photos` then
+/// `GET /v1/analysis/{job_id}`).
 abstract class IdentificationRepository {
   Future<IdentificationResult> identify({required String framing});
-
-  /// Forces the next [identify] call to fail with no confident match.
-  set alwaysFail(bool value);
-}
-
-class MockIdentificationRepository implements IdentificationRepository {
-  MockIdentificationRepository(this._client);
-
-  final MockApiClient _client;
-
-  bool _alwaysFail = false;
-
-  @override
-  set alwaysFail(bool value) => _alwaysFail = value;
-
-  @override
-  Future<IdentificationResult> identify({required String framing}) =>
-      _client.send(
-        '/identify',
-        () {
-          if (_alwaysFail) {
-            throw const NoConfidentMatch();
-          }
-          return IdentificationResult(
-            species: MockSpecies.byId('monstera-deliciosa'),
-            // The scripted match reports the specification's own confidence.
-            confidence: 94,
-            rationale:
-                'Matched on leaf shape, fenestration pattern and petiole angle.',
-            alternatives: [
-              IdentificationAlternative(
-                species: MockSpecies.byId('monstera-adansonii'),
-                confidence: 71,
-              ),
-              IdentificationAlternative(
-                species: MockSpecies.byId('rhaphidophora-tetrasperma'),
-                confidence: 63,
-              ),
-            ],
-          );
-        },
-        params: {'framing': framing},
-      );
 }
 
 /// Raised when nothing clears the confidence threshold.

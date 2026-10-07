@@ -3,9 +3,10 @@
 A living index of every plant you keep — and how each one is really doing.
 
 This is the Flutter implementation of the **The Plant Gram** design
-specification (`The Plant Gram.pdf`, the source of truth for every screen).
-The product is now named **Florensic**; the Dart package and Android
-application id still read `plant_gram`, so installs and imports stay stable.
+specification (`The Plant Gram.pdf`, the source of truth for every screen),
+running against the Florensic API. The product is named **Florensic**; the
+Dart package and Android application id still read `plant_gram`, so installs
+and imports stay stable.
 The frontend is fully functional against mock services: identification,
 health scoring and weather are scripted stand-ins behind repository
 interfaces, ready to be swapped for real APIs.
@@ -14,8 +15,12 @@ interfaces, ready to be swapped for real APIs.
 
 ```sh
 flutter pub get
-flutter run
+flutter run                                   # against the Florensic API
+flutter run --dart-define=API_BASE_URL=…      # against a deployed API
 ```
+
+Backend wiring, what is live and what is still mocked:
+[`doc/backend-integration.md`](doc/backend-integration.md).
 
 After changing any `@observable` / `@action` / `@computed` code:
 
@@ -40,9 +45,11 @@ is platform-specific).
 ```
 lib/
 ├── domain/
+│   ├── core/            # HttpClient, TokenStore, JSON readers
 │   ├── models/          # Plant, PlantSpecies, health, schedule, weather…
-│   └── repositories/    # Abstract repositories + mock implementations
-│       └── mock/        # Seed data and the mock API client
+│   ├── provider/        # One provider per API area
+│   └── repositories/    # Interfaces + remote implementations
+│       └── remote/      # The API-backed repositories
 ├── interceptors/        # Request hooks (logging, latency) around the client
 ├── screens/             # One folder per flow (auth, home, plants, pokedex…)
 ├── shared/
@@ -84,9 +91,11 @@ document and can be replaced one-for-one with final assets.
 
 ## Honest limitations
 
-- Plant identification, health scoring and weather are **mock services**.
-  The scan flow returns a scripted match; no camera stream or vision model
-  is attached.
-- Permission toggles record intent only; platform permission prompts are
-  wired up when the real camera / location features land.
-- Auth accepts any well-formed credentials against the mock repository.
+- **The app has no mock data.** Everything on screen comes from the API.
+  Where the backend has no endpoint yet — the weather card, the environment
+  chart and the notifications feed — the screen says so instead of showing
+  invented numbers.
+- **Sign-in is email + OTP only.** Google and Apple need platform SDKs to
+  mint an `id_token`, so they are not offered.
+- **iOS** has no target in this repo yet — the camera permissions are
+  declared for Android only. See `doc/backend-integration.md`.

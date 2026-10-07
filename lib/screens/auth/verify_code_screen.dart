@@ -9,6 +9,7 @@ import '../../routes.dart';
 import '../../shared/components/app_button.dart';
 import '../../shared/components/app_surfaces.dart';
 import '../../shared/components/app_text_field.dart';
+import '../../shared/components/app_toast.dart';
 import '../../shared/widgets/pg_icon.dart';
 import '../../stores/auth_store.dart';
 import '../../theme.dart';
@@ -26,23 +27,17 @@ class _VerifyCodeScreenState extends State<VerifyCodeScreen> {
   final AuthStore _store = locator<AuthStore>();
   final FocusNode _focus = FocusNode();
   final TextEditingController _hidden = TextEditingController();
+  final TextEditingController _newPassword = TextEditingController();
   Timer? _timer;
 
   @override
   void initState() {
     super.initState();
-    if (_store.pendingEmail.isEmpty) {
-      _store.pendingEmail = 'alex.moreau@studio.co';
-    }
-    // Seed the first digits so the screen reads as the design shows it.
-    for (var i = 0; i < 3; i++) {
-      _store.setCodeDigit(i, ['4', '1', '9'][i]);
-    }
     _hidden.text = _store.codeValue;
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       _store.tickResend();
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) => _focus.requestFocus());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _openKeyboard());
   }
 
   @override
@@ -50,7 +45,36 @@ class _VerifyCodeScreenState extends State<VerifyCodeScreen> {
     _timer?.cancel();
     _focus.dispose();
     _hidden.dispose();
+    _newPassword.dispose();
     super.dispose();
+  }
+
+  /// Brings the keyboard back.
+  ///
+  /// The boxes are presentation only; the real input is an off-screen field.
+  /// Once the keyboard is dismissed that field usually still holds focus, and
+  /// `requestFocus()` on a node that already has it is a no-op — so the
+  /// keyboard would never return. Dropping focus first makes the next request
+  /// a real one.
+  void _openKeyboard() {
+    if (!mounted) return;
+    if (_focus.hasFocus) {
+      _focus.unfocus();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _focus.requestFocus();
+        _caretToEnd();
+      });
+      return;
+    }
+    _focus.requestFocus();
+    _caretToEnd();
+  }
+
+  /// Regaining focus can leave the caret at the start, which would insert the
+  /// next digit in front of the ones already entered.
+  void _caretToEnd() {
+    _hidden.selection = TextSelection.collapsed(offset: _hidden.text.length);
   }
 
   void _onChanged(String value) {
@@ -61,10 +85,26 @@ class _VerifyCodeScreenState extends State<VerifyCodeScreen> {
   }
 
   Future<void> _verify() async {
+    // A `reset` code sets a new password; every other purpose opens a
+    // session (§2).
+    if (_store.isResettingPassword) {
+      final done = await _store.resetPassword(_newPassword.text);
+      if (done && mounted) {
+        Navigator.of(context).pop();
+        AppToast.show(
+          context,
+          message: 'Password updated',
+          detail: 'Sign in with your new password.',
+        );
+      }
+      return;
+    }
+
     final ok = await _store.verifyCode();
     if (ok && mounted) {
-      Navigator.of(context)
-          .pushNamedAndRemoveUntil(AppRoutes.onboarding, (route) => false);
+      Navigator.of(
+        context,
+      ).pushNamedAndRemoveUntil(AppRoutes.onboarding, (route) => false);
     }
   }
 
@@ -95,8 +135,12 @@ class _VerifyCodeScreenState extends State<VerifyCodeScreen> {
                 ),
                 Observer(
                   builder: (context) => ListView(
-                    padding: const EdgeInsets.fromLTRB(AppSpacing.gutter,
-                        AppSpacing.lg, AppSpacing.gutter, AppSpacing.gutter),
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.gutter,
+                      AppSpacing.lg,
+                      AppSpacing.gutter,
+                      AppSpacing.gutter,
+                    ),
                     children: [
                       Align(
                         alignment: Alignment.centerLeft,
@@ -106,28 +150,22 @@ class _VerifyCodeScreenState extends State<VerifyCodeScreen> {
                         ),
                       ),
                       const SizedBox(height: AppSpacing.xxl),
-                      Container(
-                        width: 68,
-                        height: 68,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: AppColors.ink,
-                          borderRadius: BorderRadius.circular(22),
-                        ),
-                        child: const PgIcon(PgIcons.mail,
-                            size: 32, color: AppColors.leaf),
+                      Text(
+                        'Check your inbox.',
+                        style: AppText.display40.copyWith(fontSize: 35.5),
                       ),
-                      const SizedBox(height: AppSpacing.xxl),
-                      Text('Check your inbox.',
-                          style: AppText.display40.copyWith(fontSize: 35.5)),
                       const SizedBox(height: AppSpacing.md),
                       Text.rich(
                         TextSpan(
                           style: AppText.body15.copyWith(fontSize: 16),
                           children: [
-                            const TextSpan(text: 'We sent a six-digit code to '),
+                            const TextSpan(
+                              text: 'We sent a six-digit code to ',
+                            ),
                             TextSpan(
-                              text: _store.pendingEmail,
+                              text: _store.pendingEmail.isEmpty
+                                  ? 'your inbox'
+                                  : _store.pendingEmail,
                               style: const TextStyle(
                                 color: AppColors.ink,
                                 fontWeight: FontWeight.w700,
@@ -138,23 +176,29 @@ class _VerifyCodeScreenState extends State<VerifyCodeScreen> {
                         ),
                       ),
                       const SizedBox(height: AppSpacing.xxxl),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          for (var i = 0; i < 6; i++)
-                            CodeField(
-                              value: _store.code[i],
-                              focused: i == _store.codeValue.length,
-                              onTap: () => _focus.requestFocus(),
-                            ),
-                        ],
+                      GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: _openKeyboard,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            for (var i = 0; i < 6; i++)
+                              CodeField(
+                                value: _store.code[i],
+                                focused: i == _store.codeValue.length,
+                                onTap: _openKeyboard,
+                              ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: AppSpacing.xl),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text("Didn't get it?",
-                              style: AppText.body15.copyWith(fontSize: 15)),
+                          Text(
+                            "Didn't get it?",
+                            style: AppText.body15.copyWith(fontSize: 15),
+                          ),
                           const SizedBox(width: AppSpacing.sm),
                           AppButton(
                             label: _store.resendSeconds > 0
@@ -164,59 +208,52 @@ class _VerifyCodeScreenState extends State<VerifyCodeScreen> {
                             expand: false,
                             onPressed: _store.resendSeconds > 0
                                 ? null
-                                : () => _store.requestCode(_store.pendingEmail),
+                                : () => _store.requestCode(
+                                    _store.pendingEmail,
+                                    purpose: _store.otpPurpose,
+                                  ),
                           ),
                         ],
                       ),
+                      if (_store.isResettingPassword) ...[
+                        const SizedBox(height: AppSpacing.xl),
+                        AppTextField(
+                          label: 'New password',
+                          hint: 'At least 8 characters',
+                          controller: _newPassword,
+                          obscureText: true,
+                          textInputAction: TextInputAction.done,
+                          autofillHints: const [AutofillHints.newPassword],
+                          onChanged: (_) => _store.clearError(),
+                          onSubmitted: (_) => _verify(),
+                        ),
+                      ],
+                      if (_store.errorMessage != null) ...[
+                        const SizedBox(height: AppSpacing.lg),
+                        Text(
+                          _store.errorMessage!,
+                          style: AppText.body13.copyWith(
+                            fontSize: 13,
+                            color: AppColors.criticalDeep,
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: AppSpacing.xl),
                       AppButton.primary(
-                        label: 'Verify and continue',
+                        label: _store.isResettingPassword
+                            ? 'Set new password'
+                            : 'Verify and continue',
                         loading: _store.isLoading,
                         onPressed: _store.canVerify ? _verify : null,
-                      ),
-                      const SizedBox(height: AppSpacing.xl),
-                      AppCard(
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 52,
-                              height: 52,
-                              alignment: Alignment.center,
-                              decoration: const BoxDecoration(
-                                color: AppColors.softGreen,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const PgIcon(PgIcons.check,
-                                  size: 24, color: AppColors.healthyDeep),
-                            ),
-                            const SizedBox(width: AppSpacing.lg),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('Password reset complete',
-                                      style: AppText.heading17
-                                          .copyWith(fontSize: 16)),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    'Shown here as the same confirmation '
-                                    'pattern used after a reset link is '
-                                    'followed.',
-                                    style:
-                                        AppText.body13.copyWith(fontSize: 14),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
                       ),
                       const SizedBox(height: AppSpacing.xxxl),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text('Wrong address?',
-                              style: AppText.body15.copyWith(fontSize: 14)),
+                          Text(
+                            'Wrong address?',
+                            style: AppText.body15.copyWith(fontSize: 14),
+                          ),
                           const SizedBox(width: AppSpacing.sm),
                           AppButton(
                             label: 'Change email',

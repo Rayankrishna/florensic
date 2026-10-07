@@ -9,17 +9,20 @@ import '../../shared/components/app_button.dart';
 import '../../shared/components/app_chip.dart';
 import '../../shared/components/headers.dart';
 import '../../shared/components/pressable.dart';
+import '../../shared/services/capture_service.dart';
+import '../../shared/widgets/live_viewfinder.dart';
 import '../../shared/widgets/pg_icon.dart';
-import '../../shared/widgets/plant_artwork.dart';
 import '../../stores/pokedex_store.dart';
 import '../../stores/scanning_store.dart';
 import '../../theme.dart';
 
 /// `Identify a plant`.
 ///
-/// The viewfinder is a rendered stand-in — no camera stream is attached and no
-/// image recognition runs on device. Capturing calls the identification
-/// service, which returns a scripted match in this build.
+/// The shared [LiveViewfinder] on the rear camera. The shutter takes the
+/// frame in app and hands it to the identification service; the preview
+/// holds on that frame, blurred, while it is identified. With no camera to
+/// show, the drawn stand-in returns and the shutter falls back to the
+/// system camera.
 class ScanScreen extends StatefulWidget {
   const ScanScreen({super.key});
 
@@ -27,35 +30,41 @@ class ScanScreen extends StatefulWidget {
   State<ScanScreen> createState() => _ScanScreenState();
 }
 
-class _ScanScreenState extends State<ScanScreen>
-    with SingleTickerProviderStateMixin {
+class _ScanScreenState extends State<ScanScreen> {
   final ScanningStore _store = locator<ScanningStore>();
-
-  late final AnimationController _sweep;
+  late final LiveViewfinderController _viewfinder =
+      LiveViewfinderController(capture: locator<CaptureService>());
 
   @override
   void initState() {
     super.initState();
-    _sweep = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2400),
-    )..repeat(reverse: true);
     _store.resetScan();
   }
 
   @override
   void dispose() {
-    _sweep.dispose();
+    _viewfinder.dispose();
     super.dispose();
   }
 
   Future<void> _scan() async {
     HapticFeedback.mediumImpact();
-    await _store.scanPlant();
+    // Without a camera to show, the shutter falls back to the system camera.
+    final shot = await _viewfinder.shutter(fallback: _store.scanPlant);
+    if (shot != null) await _store.identifyPhoto(shot);
+    _showOutcome();
+  }
+
+  Future<void> _pickFromLibrary() async {
+    await _store.selectImage();
+    _showOutcome();
+  }
+
+  void _showOutcome() {
     if (!mounted) return;
     if (_store.hasMatch) {
       Navigator.of(context).pushReplacementNamed(AppRoutes.scanResult);
-    } else {
+    } else if (_store.showFailureSheet) {
       _showFailureSheet();
     }
   }
@@ -75,9 +84,13 @@ class _ScanScreenState extends State<ScanScreen>
           Navigator.of(sheetContext).pop();
           Navigator.of(context).pushReplacementNamed(AppRoutes.pokedex);
         },
+        onSettings: () {
+          Navigator.of(sheetContext).pop();
+          _store.openSettings();
+        },
         photoLibraryEnabled: _store.photoLibraryEnabled,
       ),
-    );
+    ).whenComplete(_viewfinder.resumePreview);
   }
 
   @override
@@ -87,233 +100,133 @@ class _ScanScreenState extends State<ScanScreen>
       child: Scaffold(
         backgroundColor: AppColors.scanDark,
         body: Observer(
-          builder: (context) => Stack(
-            fit: StackFit.expand,
-            children: [
-              const DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Color(0xFF1B3A22),
-                      Color(0xFF13291A),
-                      Color(0xFF060E08),
-                    ],
-                  ),
-                ),
-              ),
-              const Positioned(
-                left: -60,
-                bottom: 60,
-                width: 520,
-                height: 520,
-                child: PlantArtwork(
-                  glyph: PlantGlyph.monstera,
-                  showGround: false,
-                  tint: Color(0xFF040B05),
-                  opacity: 0.94,
-                ),
-              ),
-              if (_store.isScanning)
-                AnimatedBuilder(
-                  animation: _sweep,
-                  builder: (context, _) => Align(
-                    alignment: Alignment(0, _sweep.value * 2 - 1),
-                    child: Container(
-                      height: 2,
-                      margin: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.xxxl,
-                      ),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            AppColors.leaf.withValues(alpha: 0),
-                            AppColors.leaf,
-                            AppColors.leaf.withValues(alpha: 0),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              SafeArea(
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.gutter,
-                        AppSpacing.lg,
-                        AppSpacing.gutter,
-                        0,
-                      ),
-                      child: NavHeader(
-                        title: 'Identify a plant',
-                        onBack: () => Navigator.of(context).maybePop(),
-                        leadingIcon: PgIcons.close,
-                        foreground: Colors.white,
-                        background: const Color(0x33FFFFFF),
-                        trailing: CircleIconButton(
-                          icon: PgIcons.flash,
-                          onPressed: _store.toggleTorch,
-                          background: _store.torchOn
-                              ? AppColors.leaf
-                              : const Color(0x33FFFFFF),
-                          foreground: _store.torchOn
-                              ? AppColors.ink
-                              : Colors.white,
-                          elevated: false,
-                          semanticLabel: 'Torch',
-                        ),
-                      ),
-                    ),
-                    const Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.fromLTRB(
+          builder: (context) {
+            final busy = _store.isScanning || _store.isCapturing;
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                LiveViewfinder(controller: _viewfinder),
+                if (busy) const ViewfinderSweep(),
+                SafeArea(
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
                           AppSpacing.gutter,
-                          AppSpacing.xxxl,
+                          AppSpacing.lg,
                           AppSpacing.gutter,
                           0,
                         ),
-                        child: CustomPaint(
-                          painter: _CornerFramePainter(),
-                          child: SizedBox.expand(),
+                        child: NavHeader(
+                          title: 'Identify a plant',
+                          onBack: () => Navigator.of(context).maybePop(),
+                          leadingIcon: PgIcons.close,
+                          foreground: Colors.white,
+                          background: const Color(0x33FFFFFF),
+                          trailing: ViewfinderTorchButton(
+                            controller: _viewfinder,
+                          ),
                         ),
                       ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.xxl,
-                        AppSpacing.xxl,
-                        AppSpacing.xxl,
-                        AppSpacing.xl,
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.gutter,
+                            AppSpacing.xxxl,
+                            AppSpacing.gutter,
+                            0,
+                          ),
+                          child: ViewfinderFrame(controller: _viewfinder),
+                        ),
                       ),
-                      child: Column(
-                        children: [
-                          Text(
-                            _store.isScanning
-                                ? 'Identifying…'
-                                : 'Point at a single leaf',
-                            style: AppText.heading20.copyWith(
-                              fontSize: 22.5,
-                              color: Colors.white,
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.xxl,
+                          AppSpacing.xxl,
+                          AppSpacing.xxl,
+                          AppSpacing.xl,
+                        ),
+                        child: Column(
+                          children: [
+                            Text(
+                              busy ? 'Identifying…' : 'Point at a single leaf',
+                              style: AppText.heading20.copyWith(
+                                fontSize: 22.5,
+                                color: Colors.white,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: AppSpacing.md),
-                          Text(
-                            'Fill the frame with one healthy leaf in even '
-                            'light — that gives the cleanest match.',
-                            textAlign: TextAlign.center,
-                            style: AppText.body15.copyWith(
-                              fontSize: 15,
-                              color: Colors.white.withValues(alpha: 0.72),
+                            const SizedBox(height: AppSpacing.md),
+                            Text(
+                              'Fill the frame with one healthy leaf in even '
+                              'light — that gives the cleanest match.',
+                              textAlign: TextAlign.center,
+                              style: AppText.body15.copyWith(
+                                fontSize: 15,
+                                color: Colors.white.withValues(alpha: 0.72),
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: AppSpacing.xl),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              for (final target in ScanTarget.values) ...[
-                                if (target != ScanTarget.values.first)
-                                  const SizedBox(width: AppSpacing.md),
-                                _TargetChip(
-                                  label: target.label,
-                                  selected: _store.target == target,
-                                  onTap: () => _store.setTarget(target),
-                                ),
+                            const SizedBox(height: AppSpacing.xl),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                for (final target in ScanTarget.values) ...[
+                                  if (target != ScanTarget.values.first)
+                                    const SizedBox(width: AppSpacing.md),
+                                  _TargetChip(
+                                    label: target.label,
+                                    selected: _store.target == target,
+                                    onTap: () => _store.setTarget(target),
+                                  ),
+                                ],
                               ],
-                            ],
-                          ),
-                        ],
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.xxxl,
-                        0,
-                        AppSpacing.xxxl,
-                        AppSpacing.xl,
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _RoundAction(
-                            icon: PgIcons.image,
-                            onTap: () async {
-                              await _store.selectImage();
-                              if (!context.mounted) return;
-                              if (_store.hasMatch) {
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.xxxl,
+                          0,
+                          AppSpacing.xxxl,
+                          AppSpacing.xl,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            ViewfinderAction(
+                              icon: PgIcons.image,
+                              onTap: busy ? null : _pickFromLibrary,
+                              semanticLabel: 'Choose from library',
+                            ),
+                            ViewfinderShutter(
+                              busy: busy,
+                              onTap: _scan,
+                              icon: PgIcons.scan,
+                              semanticLabel: 'Identify',
+                            ),
+                            ViewfinderAction(
+                              icon: PgIcons.search,
+                              onTap: () {
+                                locator<PokedexStore>().clearFilters();
                                 Navigator.of(
                                   context,
-                                ).pushReplacementNamed(AppRoutes.scanResult);
-                              } else {
-                                _showFailureSheet();
-                              }
-                            },
-                            semanticLabel: 'Choose from library',
-                          ),
-                          _ShutterButton(busy: _store.isScanning, onTap: _scan),
-                          _RoundAction(
-                            icon: PgIcons.search,
-                            onTap: () {
-                              locator<PokedexStore>().clearFilters();
-                              Navigator.of(
-                                context,
-                              ).pushReplacementNamed(AppRoutes.pokedex);
-                            },
-                            semanticLabel: 'Search manually',
-                          ),
-                        ],
+                                ).pushReplacementNamed(AppRoutes.pokedex);
+                              },
+                              semanticLabel: 'Search manually',
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            );
+          },
         ),
       ),
     );
   }
-}
-
-class _CornerFramePainter extends CustomPainter {
-  const _CornerFramePainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = AppColors.leaf
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.6
-      ..strokeCap = StrokeCap.round;
-
-    const r = 26.0;
-    const arm = 66.0;
-    final corners = [
-      // (startX, startY, cornerX, cornerY, endX, endY)
-      [0.0, r + arm, 0.0, 0.0, r + arm, 0.0],
-      [size.width - r - arm, 0.0, size.width, 0.0, size.width, r + arm],
-      [
-        size.width,
-        size.height - r - arm,
-        size.width,
-        size.height,
-        size.width - r - arm,
-        size.height,
-      ],
-      [r + arm, size.height, 0.0, size.height, 0.0, size.height - r - arm],
-    ];
-    for (final c in corners) {
-      final path = Path()
-        ..moveTo(c[0], c[1])
-        ..quadraticBezierTo(c[2], c[3], c[4], c[5]);
-      canvas.drawPath(path, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_CornerFramePainter oldDelegate) => false;
 }
 
 class _TargetChip extends StatelessWidget {
@@ -359,92 +272,18 @@ class _TargetChip extends StatelessWidget {
   }
 }
 
-class _RoundAction extends StatelessWidget {
-  const _RoundAction({
-    required this.icon,
-    required this.onTap,
-    required this.semanticLabel,
-  });
-
-  final PgIcons icon;
-  final VoidCallback onTap;
-  final String semanticLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    return Pressable(
-      onTap: onTap,
-      scale: 0.92,
-      semanticLabel: semanticLabel,
-      child: Container(
-        width: 58,
-        height: 58,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(AppRadius.tile),
-        ),
-        child: PgIcon(icon, size: 24, color: Colors.white),
-      ),
-    );
-  }
-}
-
-class _ShutterButton extends StatelessWidget {
-  const _ShutterButton({required this.busy, required this.onTap});
-
-  final bool busy;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Pressable(
-      onTap: busy ? null : onTap,
-      scale: 0.9,
-      semanticLabel: 'Identify',
-      child: Container(
-        width: 96,
-        height: 96,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: Colors.white.withValues(alpha: 0.16),
-        ),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
-          width: busy ? 62 : 76,
-          height: busy ? 62 : 76,
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            color: AppColors.leaf,
-          ),
-          child: busy
-              ? const Padding(
-                  padding: EdgeInsets.all(18),
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.6,
-                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.ink),
-                  ),
-                )
-              : const Center(
-                  child: PgIcon(PgIcons.scan, size: 30, color: AppColors.ink),
-                ),
-        ),
-      ),
-    );
-  }
-}
-
 /// `We couldn't place this one` — the identification failure sheet.
 class _NoMatchSheet extends StatelessWidget {
   const _NoMatchSheet({
     required this.onTryAgain,
     required this.onSearch,
+    required this.onSettings,
     required this.photoLibraryEnabled,
   });
 
   final VoidCallback onTryAgain;
   final VoidCallback onSearch;
+  final VoidCallback onSettings;
   final bool photoLibraryEnabled;
 
   @override
@@ -579,7 +418,7 @@ class _NoMatchSheet extends StatelessWidget {
                             expand: false,
                             height: 44,
                             fontSize: 14,
-                            onPressed: () => Navigator.of(context).pop(),
+                            onPressed: onSettings,
                           ),
                         ],
                       ),

@@ -106,14 +106,12 @@ class _ScoreBadge extends StatelessWidget {
         score?.toString() ?? '—',
         style: AppText.heading17.copyWith(
           fontSize: 16,
-          color: score == null
-              ? AppColors.inkMuted
-              : switch (HealthBandX.fromScore(score)) {
-                  HealthBand.thriving => AppColors.healthyDeep,
-                  HealthBand.watch => AppColors.cautionDeep,
-                  HealthBand.critical => AppColors.criticalDeep,
-                  HealthBand.paused => AppColors.inkMuted,
-                },
+          color: switch (HealthBandX.fromScore(score)) {
+            HealthBand.thriving => AppColors.healthyDeep,
+            HealthBand.watch => AppColors.cautionDeep,
+            HealthBand.critical => AppColors.criticalDeep,
+            null => AppColors.inkMuted,
+          },
         ),
       ),
     );

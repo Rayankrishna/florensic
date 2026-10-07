@@ -58,10 +58,10 @@ mixin _$ProfileStore on _ProfileStore, Store {
     () => super.underActiveCare,
     name: '_ProfileStore.underActiveCare',
   )).value;
-  Computed<int>? _$averageHealthComputed;
+  Computed<int?>? _$averageHealthComputed;
 
   @override
-  int get averageHealth => (_$averageHealthComputed ??= Computed<int>(
+  int? get averageHealth => (_$averageHealthComputed ??= Computed<int?>(
     () => super.averageHealth,
     name: '_ProfileStore.averageHealth',
   )).value;

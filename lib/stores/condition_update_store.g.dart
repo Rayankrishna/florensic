@@ -125,6 +125,42 @@ mixin _$ConditionUpdateStore on _ConditionUpdateStore, Store {
     });
   }
 
+  late final _$photoAtom = Atom(
+    name: '_ConditionUpdateStore.photo',
+    context: context,
+  );
+
+  @override
+  Capture? get photo {
+    _$photoAtom.reportRead();
+    return super.photo;
+  }
+
+  @override
+  set photo(Capture? value) {
+    _$photoAtom.reportWrite(value, super.photo, () {
+      super.photo = value;
+    });
+  }
+
+  late final _$needsSettingsAtom = Atom(
+    name: '_ConditionUpdateStore.needsSettings',
+    context: context,
+  );
+
+  @override
+  bool get needsSettings {
+    _$needsSettingsAtom.reportRead();
+    return super.needsSettings;
+  }
+
+  @override
+  set needsSettings(bool value) {
+    _$needsSettingsAtom.reportWrite(value, super.needsSettings, () {
+      super.needsSettings = value;
+    });
+  }
+
   late final _$capturedAtAtom = Atom(
     name: '_ConditionUpdateStore.capturedAt',
     context: context,
@@ -257,15 +293,69 @@ mixin _$ConditionUpdateStore on _ConditionUpdateStore, Store {
   );
 
   @override
-  int get scoreDelta {
+  int? get scoreDelta {
     _$scoreDeltaAtom.reportRead();
     return super.scoreDelta;
   }
 
   @override
-  set scoreDelta(int value) {
+  set scoreDelta(int? value) {
     _$scoreDeltaAtom.reportWrite(value, super.scoreDelta, () {
       super.scoreDelta = value;
+    });
+  }
+
+  late final _$provisionalAtom = Atom(
+    name: '_ConditionUpdateStore.provisional',
+    context: context,
+  );
+
+  @override
+  bool get provisional {
+    _$provisionalAtom.reportRead();
+    return super.provisional;
+  }
+
+  @override
+  set provisional(bool value) {
+    _$provisionalAtom.reportWrite(value, super.provisional, () {
+      super.provisional = value;
+    });
+  }
+
+  late final _$modelVerdictAtom = Atom(
+    name: '_ConditionUpdateStore.modelVerdict',
+    context: context,
+  );
+
+  @override
+  ConditionVerdict? get modelVerdict {
+    _$modelVerdictAtom.reportRead();
+    return super.modelVerdict;
+  }
+
+  @override
+  set modelVerdict(ConditionVerdict? value) {
+    _$modelVerdictAtom.reportWrite(value, super.modelVerdict, () {
+      super.modelVerdict = value;
+    });
+  }
+
+  late final _$verdictDisagreementAtom = Atom(
+    name: '_ConditionUpdateStore.verdictDisagreement',
+    context: context,
+  );
+
+  @override
+  bool get verdictDisagreement {
+    _$verdictDisagreementAtom.reportRead();
+    return super.verdictDisagreement;
+  }
+
+  @override
+  set verdictDisagreement(bool value) {
+    _$verdictDisagreementAtom.reportWrite(value, super.verdictDisagreement, () {
+      super.verdictDisagreement = value;
     });
   }
 
@@ -293,8 +383,22 @@ mixin _$ConditionUpdateStore on _ConditionUpdateStore, Store {
   );
 
   @override
-  Future<void> capture() {
-    return _$captureAsyncAction.run(() => super.capture());
+  Future<void> capture({bool fromCamera = true}) {
+    return _$captureAsyncAction.run(
+      () => super.capture(fromCamera: fromCamera),
+    );
+  }
+
+  late final _$captureFromViewfinderAsyncAction = AsyncAction(
+    '_ConditionUpdateStore.captureFromViewfinder',
+    context: context,
+  );
+
+  @override
+  Future<bool> captureFromViewfinder(File file) {
+    return _$captureFromViewfinderAsyncAction.run(
+      () => super.captureFromViewfinder(file),
+    );
   }
 
   late final _$saveAsyncAction = AsyncAction(
@@ -319,6 +423,18 @@ mixin _$ConditionUpdateStore on _ConditionUpdateStore, Store {
     );
     try {
       return super.start(value);
+    } finally {
+      _$_ConditionUpdateStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  Future<void> openSettings() {
+    final _$actionInfo = _$_ConditionUpdateStoreActionController.startAction(
+      name: '_ConditionUpdateStore.openSettings',
+    );
+    try {
+      return super.openSettings();
     } finally {
       _$_ConditionUpdateStoreActionController.endAction(_$actionInfo);
     }
@@ -403,6 +519,8 @@ plant: ${plant},
 step: ${step},
 isCapturing: ${isCapturing},
 hasPhoto: ${hasPhoto},
+photo: ${photo},
+needsSettings: ${needsSettings},
 capturedAt: ${capturedAt},
 verdict: ${verdict},
 observations: ${observations},
@@ -411,6 +529,9 @@ isSaving: ${isSaving},
 errorMessage: ${errorMessage},
 newScore: ${newScore},
 scoreDelta: ${scoreDelta},
+provisional: ${provisional},
+modelVerdict: ${modelVerdict},
+verdictDisagreement: ${verdictDisagreement},
 nextCheckIn: ${nextCheckIn},
 canContinueFromReview: ${canContinueFromReview},
 canSave: ${canSave},

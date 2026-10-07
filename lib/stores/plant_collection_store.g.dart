@@ -76,10 +76,17 @@ mixin _$PlantCollectionStore on _PlantCollectionStore, Store {
         () => super.recentlyAdded,
         name: '_PlantCollectionStore.recentlyAdded',
       )).value;
-  Computed<int>? _$averageHealthComputed;
+  Computed<List<Plant>>? _$underCareComputed;
 
   @override
-  int get averageHealth => (_$averageHealthComputed ??= Computed<int>(
+  List<Plant> get underCare => (_$underCareComputed ??= Computed<List<Plant>>(
+    () => super.underCare,
+    name: '_PlantCollectionStore.underCare',
+  )).value;
+  Computed<int?>? _$averageHealthComputed;
+
+  @override
+  int? get averageHealth => (_$averageHealthComputed ??= Computed<int?>(
     () => super.averageHealth,
     name: '_PlantCollectionStore.averageHealth',
   )).value;
@@ -227,6 +234,16 @@ mixin _$PlantCollectionStore on _PlantCollectionStore, Store {
     return _$loadPlantsAsyncAction.run(() => super.loadPlants(force: force));
   }
 
+  late final _$refreshTodaysCareAsyncAction = AsyncAction(
+    '_PlantCollectionStore.refreshTodaysCare',
+    context: context,
+  );
+
+  @override
+  Future<void> refreshTodaysCare() {
+    return _$refreshTodaysCareAsyncAction.run(() => super.refreshTodaysCare());
+  }
+
   late final _$markAsWateredAsyncAction = AsyncAction(
     '_PlantCollectionStore.markAsWatered',
     context: context,
@@ -235,6 +252,30 @@ mixin _$PlantCollectionStore on _PlantCollectionStore, Store {
   @override
   Future<Plant?> markAsWatered(String plantId) {
     return _$markAsWateredAsyncAction.run(() => super.markAsWatered(plantId));
+  }
+
+  late final _$skipWateringAsyncAction = AsyncAction(
+    '_PlantCollectionStore.skipWatering',
+    context: context,
+  );
+
+  @override
+  Future<Plant?> skipWatering(String plantId, WateringSkipReason reason) {
+    return _$skipWateringAsyncAction.run(
+      () => super.skipWatering(plantId, reason),
+    );
+  }
+
+  late final _$addNoteAsyncAction = AsyncAction(
+    '_PlantCollectionStore.addNote',
+    context: context,
+  );
+
+  @override
+  Future<Plant?> addNote(String plantId, List<NoteChip> chips, {String? text}) {
+    return _$addNoteAsyncAction.run(
+      () => super.addNote(plantId, chips, text: text),
+    );
   }
 
   late final _$addPlantAsyncAction = AsyncAction(
@@ -267,6 +308,18 @@ mixin _$PlantCollectionStore on _PlantCollectionStore, Store {
   @override
   Future<void> completeTask(String taskId) {
     return _$completeTaskAsyncAction.run(() => super.completeTask(taskId));
+  }
+
+  late final _$skipTaskAsyncAction = AsyncAction(
+    '_PlantCollectionStore.skipTask',
+    context: context,
+  );
+
+  @override
+  Future<bool> skipTask(String taskId, {String? reason}) {
+    return _$skipTaskAsyncAction.run(
+      () => super.skipTask(taskId, reason: reason),
+    );
   }
 
   late final _$_PlantCollectionStoreActionController = ActionController(
@@ -341,6 +394,7 @@ openTasks: ${openTasks},
 doneTaskCount: ${doneTaskCount},
 allCaughtUp: ${allCaughtUp},
 recentlyAdded: ${recentlyAdded},
+underCare: ${underCare},
 averageHealth: ${averageHealth},
 underActiveCare: ${underActiveCare}
     ''';

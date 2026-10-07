@@ -13,6 +13,8 @@ import '../../shared/components/app_surfaces.dart';
 import '../../shared/components/app_text_field.dart';
 import '../../shared/components/headers.dart';
 import '../../shared/components/pressable.dart';
+import '../../shared/services/capture_service.dart';
+import '../../shared/widgets/live_viewfinder.dart';
 import '../../shared/widgets/pg_icon.dart';
 import '../../shared/widgets/plant_artwork.dart';
 import '../../stores/condition_update_store.dart';
@@ -105,309 +107,304 @@ class _ConditionUpdateScreenState extends State<ConditionUpdateScreen> {
 
 // ── Step 1 · Capture ───────────────────────────────────────────────────────
 
-class _CaptureStep extends StatelessWidget {
+/// The shared [LiveViewfinder] — the same camera, frame, torch and shutter
+/// as the identify screen — pointed at the whole plant.
+class _CaptureStep extends StatefulWidget {
   const _CaptureStep({required this.store, required this.onBack});
 
   final ConditionUpdateStore store;
   final VoidCallback onBack;
 
   @override
+  State<_CaptureStep> createState() => _CaptureStepState();
+}
+
+class _CaptureStepState extends State<_CaptureStep> {
+  late final LiveViewfinderController _viewfinder =
+      LiveViewfinderController(capture: locator<CaptureService>());
+
+  ConditionUpdateStore get _store => widget.store;
+
+  @override
+  void dispose() {
+    _viewfinder.dispose();
+    super.dispose();
+  }
+
+  Future<void> _shoot() async {
+    HapticFeedback.mediumImpact();
+    // Without a camera to show, the shutter falls back to the system camera.
+    final shot = await _viewfinder.shutter(fallback: () => _store.capture());
+    if (shot == null) return;
+    // The preview holds, blurred, while the photo uploads. If it could not
+    // be kept the preview runs again so the keeper can retry.
+    final kept = await _store.captureFromViewfinder(shot);
+    if (!kept) await _viewfinder.resumePreview();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final plant = store.plant!;
+    final plant = _store.plant!;
     return Observer(
-      builder: (context) => Stack(
-        fit: StackFit.expand,
-        children: [
-          const _CameraSurface(),
-          Positioned(
-            right: -70,
-            bottom: 120,
-            width: 380,
-            height: 420,
-            child: PlantArtwork(
-              glyph: plant.species.glyph,
-              showGround: false,
-              tint: const Color(0xFF040A04),
-              opacity: 0.92,
+      builder: (context) {
+        final busy = _store.isCapturing;
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            LiveViewfinder(
+              controller: _viewfinder,
+              standInGlyph: plant.species.glyph,
             ),
-          ),
-          SafeArea(
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.gutter,
-                    AppSpacing.lg,
-                    AppSpacing.gutter,
-                    0,
-                  ),
-                  child: NavHeader(
-                    title: 'Update plant condition',
-                    onBack: onBack,
-                    leadingIcon: PgIcons.close,
-                    foreground: Colors.white,
-                    background: const Color(0x33FFFFFF),
-                    progress: (step: 0, total: 3),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xxl),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.gutter,
-                  ),
-                  child: Container(
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.10),
-                      borderRadius: AppRadius.pillR,
+            if (busy) const ViewfinderSweep(),
+            SafeArea(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.gutter,
+                      AppSpacing.lg,
+                      AppSpacing.gutter,
+                      0,
                     ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 48,
-                          height: 48,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: AppColors.leaf,
-                            borderRadius: BorderRadius.circular(16),
+                    child: NavHeader(
+                      title: 'Update plant condition',
+                      onBack: widget.onBack,
+                      leadingIcon: PgIcons.close,
+                      foreground: Colors.white,
+                      background: const Color(0x33FFFFFF),
+                      progress: (step: 0, total: 3),
+                      trailing: ViewfinderTorchButton(controller: _viewfinder),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xxl),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.gutter,
+                    ),
+                    child: Container(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.10),
+                        borderRadius: AppRadius.pillR,
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: AppColors.leaf,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: const PgIcon(
+                              PgIcons.leaf,
+                              size: 24,
+                              color: AppColors.ink,
+                            ),
                           ),
-                          child: const PgIcon(
-                            PgIcons.leaf,
-                            size: 24,
-                            color: AppColors.ink,
+                          const SizedBox(width: AppSpacing.md),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  plant.nickname,
+                                  style: AppText.heading17.copyWith(
+                                    fontSize: 16.5,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                Text(
+                                  plant.daysSinceCondition == null
+                                      ? 'First condition update'
+                                      : 'Last update '
+                                            '${AppDate.relativeDays(plant.daysSinceCondition!)}',
+                                  style: AppText.body13.copyWith(
+                                    fontSize: 14,
+                                    color: Colors.white.withValues(alpha: 0.7),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.gutter,
+                        AppSpacing.xxl,
+                        AppSpacing.gutter,
+                        0,
+                      ),
+                      child: ViewfinderFrame(controller: _viewfinder),
+                    ),
+                  ),
+                  if (_store.errorMessage != null)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.gutter,
+                        AppSpacing.lg,
+                        AppSpacing.gutter,
+                        0,
+                      ),
+                      child: _CaptureError(
+                        message: _store.errorMessage!,
+                        showSettings: _store.needsSettings,
+                        onSettings: _store.openSettings,
+                      ),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.xxl,
+                      AppSpacing.xxl,
+                      AppSpacing.xxl,
+                      AppSpacing.xl,
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          busy
+                              ? 'Saving your photo…'
+                              : 'Take a photo of the whole plant',
+                          textAlign: TextAlign.center,
+                          style: AppText.heading20.copyWith(
+                            fontSize: 22.5,
+                            color: Colors.white,
                           ),
                         ),
-                        const SizedBox(width: AppSpacing.md),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                plant.nickname,
-                                style: AppText.heading17.copyWith(
-                                  fontSize: 16.5,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              Text(
-                                plant.daysSinceCondition == null
-                                    ? 'First condition update'
-                                    : 'Last update '
-                                          '${AppDate.relativeDays(plant.daysSinceCondition!)}',
-                                style: AppText.body13.copyWith(
-                                  fontSize: 14,
-                                  color: Colors.white.withValues(alpha: 0.7),
-                                ),
-                              ),
-                            ],
+                        const SizedBox(height: AppSpacing.md),
+                        Text(
+                          "Keeps your plant's health history up to date. Same "
+                          'angle as last time works best.',
+                          textAlign: TextAlign.center,
+                          style: AppText.body15.copyWith(
+                            fontSize: 15,
+                            color: Colors.white.withValues(alpha: 0.72),
                           ),
                         ),
                       ],
                     ),
                   ),
-                ),
-                const SizedBox(height: AppSpacing.xxl),
-                const Expanded(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: AppSpacing.gutter,
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.xxxl,
+                      0,
+                      AppSpacing.xxxl,
+                      AppSpacing.xl,
                     ),
-                    child: CustomPaint(
-                      painter: _FramePainter(),
-                      child: SizedBox.expand(),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        ViewfinderAction(
+                          icon: PgIcons.image,
+                          onTap: busy
+                              ? null
+                              : () => _store.capture(fromCamera: false),
+                          semanticLabel: 'Choose from library',
+                        ),
+                        ViewfinderShutter(
+                          busy: busy,
+                          onTap: _shoot,
+                          icon: PgIcons.camera,
+                          semanticLabel: 'Take photo',
+                        ),
+                        // Nothing on the right; keeps the shutter centred.
+                        ViewfinderAction.spacer,
+                      ],
                     ),
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.xxl,
-                    AppSpacing.xxl,
-                    AppSpacing.xxl,
-                    AppSpacing.lg,
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        'Take a photo of the whole plant',
-                        textAlign: TextAlign.center,
-                        style: AppText.heading20.copyWith(
-                          fontSize: 21.5,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      Text(
-                        "Keeps your plant's health history up to date. Same angle "
-                        'as last time works best.',
-                        textAlign: TextAlign.center,
-                        style: AppText.body15.copyWith(
-                          fontSize: 15,
-                          color: Colors.white.withValues(alpha: 0.72),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.gutter,
-                    0,
-                    AppSpacing.gutter,
-                    AppSpacing.xl,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _CameraChip(
-                        icon: PgIcons.image,
-                        onTap: store.capture,
-                        semanticLabel: 'Choose from library',
-                      ),
-                      _Shutter(busy: store.isCapturing, onTap: store.capture),
-                      _CameraChip(
-                        icon: PgIcons.refresh,
-                        onTap: () {},
-                        semanticLabel: 'Flip camera',
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// A capture failure on the dark camera surface, with a way to Settings when
+/// a permission was permanently refused.
+class _CaptureError extends StatelessWidget {
+  const _CaptureError({
+    required this.message,
+    required this.showSettings,
+    required this.onSettings,
+  });
+
+  final String message;
+  final bool showSettings;
+  final VoidCallback onSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppRadius.tile),
+      ),
+      child: Row(
+        children: [
+          const PgIcon(PgIcons.alertTriangle, size: 22, color: AppColors.leaf),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Text(
+              message,
+              style: AppText.body13.copyWith(
+                fontSize: 13.5,
+                color: Colors.white,
+              ),
             ),
           ),
+          if (showSettings) ...[
+            const SizedBox(width: AppSpacing.sm),
+            AppButton.primary(
+              label: 'Settings',
+              expand: false,
+              height: 40,
+              fontSize: 14,
+              onPressed: onSettings,
+            ),
+          ],
         ],
       ),
     );
   }
 }
 
-class _CameraSurface extends StatelessWidget {
-  const _CameraSurface();
+/// Stands in for the capture while it is being taken, and if the file cannot
+/// be read back.
+class _ArtworkStandIn extends StatelessWidget {
+  const _ArtworkStandIn({required this.plant});
+
+  final Plant plant;
 
   @override
   Widget build(BuildContext context) {
-    return const DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFF14301B), Color(0xFF0C1B10), Color(0xFF060E08)],
-          stops: [0, 0.55, 1],
-        ),
-      ),
-    );
-  }
-}
-
-/// A capture frame with two lime corner accents, as the design shows.
-class _FramePainter extends CustomPainter {
-  const _FramePainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(0, 0, size.width, size.height),
-      const Radius.circular(AppRadius.card),
-    );
-    canvas.drawRRect(
-      rect,
-      Paint()
-        ..color = Colors.white.withValues(alpha: 0.32)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.4,
-    );
-
-    final accent = Paint()
-      ..color = AppColors.leaf
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.4
-      ..strokeCap = StrokeCap.round;
-
-    const r = AppRadius.card;
-    const arm = 74.0;
-    final topLeft = Path()
-      ..moveTo(0, r + arm)
-      ..lineTo(0, r)
-      ..arcToPoint(const Offset(r, 0), radius: const Radius.circular(r))
-      ..lineTo(r + arm, 0);
-    canvas.drawPath(topLeft, accent);
-
-    final bottomRight = Path()
-      ..moveTo(size.width, size.height - r - arm)
-      ..lineTo(size.width, size.height - r)
-      ..arcToPoint(
-        Offset(size.width - r, size.height),
-        radius: const Radius.circular(r),
-      )
-      ..lineTo(size.width - r - arm, size.height);
-    canvas.drawPath(bottomRight, accent);
-  }
-
-  @override
-  bool shouldRepaint(_FramePainter oldDelegate) => false;
-}
-
-class _CameraChip extends StatelessWidget {
-  const _CameraChip({
-    required this.icon,
-    required this.onTap,
-    required this.semanticLabel,
-  });
-
-  final PgIcons icon;
-  final VoidCallback onTap;
-  final String semanticLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    return Pressable(
-      onTap: onTap,
-      semanticLabel: semanticLabel,
-      scale: 0.92,
-      child: Container(
-        width: 58,
-        height: 58,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(AppRadius.tile),
-        ),
-        child: PgIcon(icon, size: 24, color: Colors.white),
-      ),
-    );
-  }
-}
-
-class _Shutter extends StatelessWidget {
-  const _Shutter({required this.busy, required this.onTap});
-
-  final bool busy;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Pressable(
-      onTap: busy ? null : onTap,
-      semanticLabel: 'Take photo',
-      scale: 0.9,
-      child: Container(
-        width: 84,
-        height: 84,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: Colors.white.withValues(alpha: 0.16),
-        ),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
-          width: busy ? 56 : 68,
-          height: busy ? 56 : 68,
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.white,
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFF2B5230), Color(0xFF5E8B4A)],
+            ),
           ),
         ),
-      ),
+        PlantArtwork(
+          glyph: plant.species.glyph,
+          showGround: false,
+          tint: const Color(0xFF050D05),
+          inset: 0.06,
+        ),
+      ],
     );
   }
 }
@@ -457,21 +454,17 @@ class _ReviewStep extends StatelessWidget {
                       child: Stack(
                         fit: StackFit.expand,
                         children: [
-                          const DecoratedBox(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [Color(0xFF2B5230), Color(0xFF5E8B4A)],
-                              ),
-                            ),
-                          ),
-                          PlantArtwork(
-                            glyph: plant.species.glyph,
-                            showGround: false,
-                            tint: const Color(0xFF050D05),
-                            inset: 0.06,
-                          ),
+                          // The stub capture has no file on disk; the drawn
+                          // artwork stands in for it.
+                          if (store.photo?.file.existsSync() ?? false)
+                            Image.file(
+                              store.photo!.file,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, _, _) =>
+                                  _ArtworkStandIn(plant: plant),
+                            )
+                          else
+                            _ArtworkStandIn(plant: plant),
                           Positioned(
                             top: AppSpacing.lg,
                             left: AppSpacing.lg,

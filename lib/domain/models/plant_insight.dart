@@ -1,4 +1,5 @@
 import '../../enum.dart';
+import '../core/json.dart';
 
 /// A card in `Today's insights`.
 class EnvironmentalInsight {
@@ -9,6 +10,28 @@ class EnvironmentalInsight {
     required this.kind,
     this.isNew = true,
   });
+
+  factory EnvironmentalInsight.fromJson(
+    Map<String, dynamic> json, {
+    DateTime? today,
+  }) {
+    final day = Json.dateOrNull(json['day']);
+    final now = today ?? DateTime.now();
+    return EnvironmentalInsight(
+      id: Json.str(json['id']),
+      title: Json.str(json['headline']),
+      body: Json.str(json['body']),
+      kind: Json.enumOf(json['kind'], InsightKind.values, InsightKind.heat,
+          aliases: const {
+            'heat': InsightKind.heat,
+            'low_humidity': InsightKind.humidity,
+            'rain': InsightKind.rain,
+            'low_light_season': InsightKind.light,
+          }),
+      isNew: day == null ||
+          (day.year == now.year && day.month == now.month && day.day == now.day),
+    );
+  }
 
   final String id;
   final String title;
@@ -27,6 +50,26 @@ class HealthCorrelation {
     required this.humidWeeksScore,
     required this.dryWeeksScore,
   });
+
+  /// `correlation` on the insights response; null until there is enough
+  /// history, which keeps the screen's empty state honest.
+  static HealthCorrelation? fromJson(Map<String, dynamic>? json) {
+    if (json == null || json.isEmpty) return null;
+    final humid = Json.doubleOrNull(json['humid_mean'])?.round();
+    final dry = Json.doubleOrNull(json['dry_mean'])?.round();
+    if (humid == null || dry == null) return null;
+    final delta = humid - dry;
+    return HealthCorrelation(
+      headline: delta > 0
+          ? 'Humidity above 60% tracks with your best health scores.'
+          : 'Humidity is not moving your scores much yet.',
+      body: 'Across recent weeks of updates, your tropical plants score '
+          '${delta.abs()} points ${delta >= 0 ? 'higher' : 'lower'} on humid '
+          'weeks.',
+      humidWeeksScore: humid,
+      dryWeeksScore: dry,
+    );
+  }
 
   final String headline;
   final String body;

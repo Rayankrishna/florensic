@@ -20,7 +20,7 @@ class SignUpScreen extends StatefulWidget {
 }
 
 class _SignUpScreenState extends State<SignUpScreen> {
-  final _name = TextEditingController(text: 'Alex Moreau');
+  final _name = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
   final AuthStore _store = locator<AuthStore>();
@@ -39,9 +39,30 @@ class _SignUpScreenState extends State<SignUpScreen> {
     super.dispose();
   }
 
+  /// Creates the account.
+  ///
+  /// `POST /v1/auth/sign-up` answers 202 and sends the OTP, so success lands
+  /// on the code screen rather than a session.
   Future<void> _submit() async {
+    final name = _name.text.trim();
+    final email = _email.text.trim();
+    final password = _password.text;
+
+    if (name.isEmpty) {
+      _store.setError('Enter your name.');
+      return;
+    }
+    if (!email.contains('@') || email.length < 5) {
+      _store.setError('Enter a valid email address.');
+      return;
+    }
+    if (password.length < 8) {
+      _store.setError('Use at least eight characters for your password.');
+      return;
+    }
+
     FocusScope.of(context).unfocus();
-    final ok = await _store.requestCode(_email.text.trim());
+    final ok = await _store.signUp(name, email, password);
     if (ok && mounted) {
       Navigator.of(context).pushNamed(AppRoutes.verifyCode);
     }
@@ -59,8 +80,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
               builder: (context) => CustomScrollView(
                 slivers: [
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(AppSpacing.gutter,
-                        AppSpacing.lg, AppSpacing.gutter, AppSpacing.gutter),
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.gutter,
+                      AppSpacing.lg,
+                      AppSpacing.gutter,
+                      AppSpacing.gutter,
+                    ),
                     sliver: SliverList.list(
                       children: [
                         Align(
@@ -71,8 +96,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           ),
                         ),
                         const SizedBox(height: AppSpacing.xxxl),
-                        Text('Start your\ncollection.',
-                            style: AppText.display40.copyWith(fontSize: 37)),
+                        Text(
+                          'Start your\ncollection.',
+                          style: AppText.display40.copyWith(fontSize: 37),
+                        ),
                         const SizedBox(height: AppSpacing.md),
                         Text(
                           'One account keeps every plant, photo and care record '
@@ -86,6 +113,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           controller: _name,
                           textInputAction: TextInputAction.next,
                           autofillHints: const [AutofillHints.name],
+                          onChanged: (_) => _store.clearError(),
                         ),
                         const SizedBox(height: AppSpacing.xl),
                         AppTextField(
@@ -95,7 +123,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           keyboardType: TextInputType.emailAddress,
                           textInputAction: TextInputAction.next,
                           autofillHints: const [AutofillHints.email],
-                          errorText: _store.errorMessage,
                           onChanged: (_) => _store.clearError(),
                         ),
                         const SizedBox(height: AppSpacing.xl),
@@ -128,7 +155,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                 padding: const EdgeInsets.only(top: 11),
                                 child: Text.rich(
                                   TextSpan(
-                                    style: AppText.body15.copyWith(fontSize: 14),
+                                    style: AppText.body15.copyWith(
+                                      fontSize: 14,
+                                    ),
                                     children: const [
                                       TextSpan(text: 'I agree to the '),
                                       TextSpan(
@@ -157,11 +186,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           ],
                         ),
                         const SizedBox(height: AppSpacing.xxl),
+                        if (_store.errorMessage != null) ...[
+                          _FormError(message: _store.errorMessage!),
+                          const SizedBox(height: AppSpacing.md),
+                        ],
                         AppButton.primary(
                           label: 'Create account',
                           loading: _store.isLoading,
-                          onPressed:
-                              _store.canCreateAccount ? _submit : null,
+                          onPressed: _store.canCreateAccount ? _submit : null,
                         ),
                       ],
                     ),
@@ -176,15 +208,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Text('Already have an account?',
-                                  style: AppText.body15.copyWith(fontSize: 14)),
+                              Text(
+                                'Already have an account?',
+                                style: AppText.body15.copyWith(fontSize: 14),
+                              ),
                               const SizedBox(width: AppSpacing.sm),
                               AppButton(
                                 label: 'Sign in',
                                 style: AppButtonStyle.link,
                                 expand: false,
-                                onPressed: () => Navigator.of(context)
-                                    .pushReplacementNamed(AppRoutes.signIn),
+                                onPressed: () => Navigator.of(
+                                  context,
+                                ).pushReplacementNamed(AppRoutes.signIn),
                               ),
                             ],
                           ),
@@ -197,6 +232,45 @@ class _SignUpScreenState extends State<SignUpScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// One place for anything that stopped the account being created — the field
+/// checks and the backend's own message both land here.
+class _FormError extends StatelessWidget {
+  const _FormError({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.criticalTint,
+        borderRadius: BorderRadius.circular(AppRadius.tile),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const PgIcon(
+            PgIcons.alertCircle,
+            size: 19,
+            color: AppColors.criticalDeep,
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              message,
+              style: AppText.body13.copyWith(
+                fontSize: 13,
+                color: AppColors.criticalDeep,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

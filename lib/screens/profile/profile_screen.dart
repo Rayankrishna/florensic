@@ -121,9 +121,13 @@ class ProfileScreen extends StatelessWidget {
                   _StatCard(
                       value: '${store.underActiveCare}',
                       label: 'Under active care'),
+                  // `null` means nothing under care has been scored yet,
+                  // which is not the same as 0 % healthy.
                   _StatCard(
-                    value: '${store.averageHealth}',
-                    label: 'Avg. health',
+                    value: store.averageHealth?.toString() ?? '—',
+                    label: store.averageHealth == null
+                        ? 'Not scored yet'
+                        : 'Avg. health',
                     dark: true,
                   ),
                 ],

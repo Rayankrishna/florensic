@@ -3,6 +3,8 @@ import 'package:mobx/mobx.dart';
 import '../domain/models/plant_species.dart';
 import '../domain/repositories/pokedex_repository.dart';
 import '../enum.dart';
+import '../interceptors/api_interceptor.dart';
+import '../utils/app_log.dart';
 
 part 'pokedex_store.g.dart';
 
@@ -86,14 +88,25 @@ abstract class _PokedexStore with Store {
     if (!force && species.isNotEmpty) return;
     state = LoadState.loading;
     errorMessage = null;
+
+    List<PlantSpecies> resp;
     try {
-      final result = await _repository.loadCatalogue();
-      species = ObservableList<PlantSpecies>.of(result);
-      state = LoadState.ready;
-    } catch (e) {
-      errorMessage = e.toString();
-      state = LoadState.error;
+      resp = await _repository.loadCatalogue();
+    } catch (e, stack) {
+      AppLog.e('loading the catalogue failed',
+          name: 'pokedex', error: e, stackTrace: stack);
+      runInAction(() {
+        errorMessage = e is ApiException ? e.message : e.toString();
+        if (species.isEmpty) state = LoadState.error;
+      });
+      return;
     }
+
+    AppLog.i('loaded ${resp.length} species', name: 'pokedex');
+    runInAction(() {
+      species = ObservableList<PlantSpecies>.of(resp);
+      state = LoadState.ready;
+    });
   }
 
   PlantSpecies? speciesById(String id) {

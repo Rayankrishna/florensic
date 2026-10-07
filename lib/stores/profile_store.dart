@@ -36,8 +36,9 @@ abstract class _ProfileStore with Store {
   @computed
   int get underActiveCare => _collection.underActiveCare;
 
+  /// Null until a plant under care has been scored.
   @computed
-  int get averageHealth => _collection.averageHealth;
+  int? get averageHealth => _collection.averageHealth;
 
   @computed
   int get careStreakWeeks => profile?.careStreakWeeks ?? 32;

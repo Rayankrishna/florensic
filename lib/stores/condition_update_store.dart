@@ -1,10 +1,16 @@
+import 'dart:io';
+
 import 'package:mobx/mobx.dart';
 
 import '../domain/models/plant.dart';
+import '../domain/provider/photos.provider.dart';
 import '../domain/repositories/plant_repository.dart';
+import '../domain/repositories/remote/remote_plant_repository.dart';
 import '../enum.dart';
+import '../utils/app_log.dart';
+import '../interceptors/api_interceptor.dart';
+import '../shared/services/capture_service.dart';
 import 'plant_collection_store.dart';
-import '../utils/app_clock.dart';
 
 part 'condition_update_store.g.dart';
 
@@ -12,10 +18,13 @@ class ConditionUpdateStore = _ConditionUpdateStore with _$ConditionUpdateStore;
 
 /// The three-step condition update: capture → review → details.
 abstract class _ConditionUpdateStore with Store {
-  _ConditionUpdateStore(this._repository, this._collection);
+  _ConditionUpdateStore(this._repository, this._collection, this._capture,
+      this._photos);
 
   final PlantRepository _repository;
   final PlantCollectionStore _collection;
+  final CaptureService _capture;
+  final PhotosProvider _photos;
 
   static const int stepCount = 3;
 
@@ -30,6 +39,14 @@ abstract class _ConditionUpdateStore with Store {
 
   @observable
   bool hasPhoto = false;
+
+  /// The photo for this check-in, shown on the review step.
+  @observable
+  Capture? photo;
+
+  /// Set when a permission was permanently refused.
+  @observable
+  bool needsSettings = false;
 
   @observable
   DateTime? capturedAt;
@@ -53,8 +70,21 @@ abstract class _ConditionUpdateStore with Store {
   @observable
   int? newScore;
 
+  /// Null on a plant's first scored check-in — there was nothing to move
+  /// from — so the chip is only shown when it is set.
   @observable
-  int scoreDelta = 0;
+  int? scoreDelta;
+
+  /// The photo was too poor to read, so the number is held lightly.
+  @observable
+  bool provisional = false;
+
+  /// What the model made of the photo, when it ran.
+  @observable
+  ConditionVerdict? modelVerdict;
+
+  @observable
+  bool verdictDisagreement = false;
 
   @observable
   DateTime? nextCheckIn;
@@ -96,30 +126,119 @@ abstract class _ConditionUpdateStore with Store {
     plant = value;
     step = 0;
     hasPhoto = false;
+    photo = null;
+    needsSettings = false;
     capturedAt = null;
     verdict = null;
     observations.clear();
     note = '';
     newScore = null;
-    scoreDelta = 0;
+    scoreDelta = null;
+    provisional = false;
+    modelVerdict = null;
+    verdictDisagreement = false;
     errorMessage = null;
   }
 
+  /// Opens the camera and, on the real backend, uploads the frame so the
+  /// analyser has it ready when the update is saved (§3.4).
   @action
-  Future<void> capture() async {
+  Future<void> capture({bool fromCamera = true}) async {
     if (isCapturing) return;
     isCapturing = true;
-    // Stands in for the camera shutter + file write.
-    await Future<void>.delayed(const Duration(milliseconds: 450));
-    hasPhoto = true;
-    capturedAt = AppClock.now();
-    isCapturing = false;
-    step = 1;
+    errorMessage = null;
+    needsSettings = false;
+    try {
+      final taken = fromCamera
+          ? await _capture.takePhoto()
+          : await _capture.pickFromGallery();
+      if (taken == null) return; // Cancelled — stay on the camera step.
+      await _accept(taken);
+    } on PermissionPermanentlyDenied catch (e) {
+      AppLog.w('capture blocked: $e', name: 'checkin');
+      runInAction(() {
+        errorMessage = e.toString();
+        needsSettings = true;
+      });
+    } on ApiException catch (e) {
+      AppLog.e('uploading the check-in photo failed',
+          name: 'checkin', error: e);
+      runInAction(() => errorMessage = e.message);
+    } catch (e, stack) {
+      AppLog.e('capture failed', name: 'checkin', error: e, stackTrace: stack);
+      runInAction(() => errorMessage = e.toString());
+    } finally {
+      runInAction(() => isCapturing = false);
+    }
   }
+
+  /// A frame from the in-app viewfinder — the same camera the identify
+  /// screen uses. False when it could not be kept, so the preview should
+  /// resume for another try.
+  @action
+  Future<bool> captureFromViewfinder(File file) async {
+    if (isCapturing) return false;
+    isCapturing = true;
+    errorMessage = null;
+    needsSettings = false;
+    try {
+      await _accept(await _capture.fromViewfinder(file));
+      return true;
+    } on ApiException catch (e) {
+      AppLog.e('uploading the check-in photo failed',
+          name: 'checkin', error: e);
+      runInAction(() => errorMessage = e.message);
+      return false;
+    } catch (e, stack) {
+      AppLog.e('keeping the frame failed',
+          name: 'checkin', error: e, stackTrace: stack);
+      runInAction(() => errorMessage = e.toString());
+      return false;
+    } finally {
+      runInAction(() => isCapturing = false);
+    }
+  }
+
+  /// Keeps a capture, uploads it, and moves on to the review step.
+  Future<void> _accept(Capture taken) async {
+    runInAction(() {
+      photo = taken;
+      capturedAt = taken.capturedAt;
+    });
+    await _uploadIfRemote(taken);
+    runInAction(() {
+      hasPhoto = true;
+      step = 1;
+    });
+  }
+
+  /// A check-in photo is uploaded up front; the job only runs once the
+  /// verdict is submitted.
+  Future<void> _uploadIfRemote(Capture taken) async {
+    final repository = _repository;
+    if (repository is! RemotePlantRepository) return;
+    final queued = await _photos.upload(
+      filePath: taken.path,
+      purpose: PhotoPurpose.checkin,
+      plantId: plant!.id,
+      framing: 'whole_plant',
+      source: taken.source,
+      lat: taken.lat,
+      lon: taken.lon,
+      locationAccuracyM: taken.accuracyM,
+      capturedAt: taken.capturedAt,
+    );
+    repository.pendingCheckInPhotoId = queued.photoId;
+  }
+
+  /// Sends the keeper to the OS settings page for a refused permission.
+  @action
+  Future<void> openSettings() => _capture.openSettings();
 
   @action
   void retake() {
     hasPhoto = false;
+    photo = null;
     capturedAt = null;
     step = 0;
   }
@@ -156,27 +275,49 @@ abstract class _ConditionUpdateStore with Store {
     if (p == null || v == null) return false;
     isSaving = true;
     errorMessage = null;
+
+    CheckInResult result;
     try {
-      final before = p.healthScore ?? 70;
-      final updated = await _repository.submitConditionUpdate(
+      result = await _repository.submitConditionUpdate(
         p.id,
         verdict: v,
         observations: observations.toList(),
         note: note,
       );
+    } on ApiException catch (e) {
+      AppLog.e('saving the check-in failed', name: 'checkin', error: e);
+      runInAction(() {
+        errorMessage = e.message;
+        isSaving = false;
+      });
+      return false;
+    } catch (e, stack) {
+      AppLog.e('saving the check-in failed',
+          name: 'checkin', error: e, stackTrace: stack);
+      runInAction(() {
+        errorMessage = e.toString();
+        isSaving = false;
+      });
+      return false;
+    }
+
+    final updated = result.plant;
+    final update = result.update;
+    AppLog.i('check-in saved for ${updated.nickname}', name: 'checkin');
+    runInAction(() {
       plant = updated;
       _collection.replacePlant(updated);
+      // The score is the server's; nothing here does arithmetic on it.
       newScore = updated.healthScore;
-      scoreDelta = (updated.healthScore ?? before) - before;
-      nextCheckIn = updated.schedule.checkInWindowOpens;
+      scoreDelta = update?.scoreDelta;
+      provisional = update?.provisional ?? false;
+      modelVerdict = update?.modelVerdict;
+      verdictDisagreement = update?.verdictDisagreement ?? false;
+      nextCheckIn = result.nextCheckIn ?? updated.schedule.checkInWindowOpens;
       _collection.completeTask('task-cond-${p.id}');
-      return true;
-    } catch (e) {
-      errorMessage = e.toString();
-      return false;
-    } finally {
       isSaving = false;
-    }
+    });
+    return true;
   }
 
   static String _shortDate(DateTime d) {

@@ -5,7 +5,6 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import '../../locator.dart';
 import '../../routes.dart';
 import '../../shared/components/app_button.dart';
-import '../../shared/widgets/pg_icon.dart';
 import '../../stores/auth_store.dart';
 import '../../theme.dart';
 import '../splash/splash_screen.dart';
@@ -14,130 +13,141 @@ import '../splash/splash_screen.dart';
 class AuthLandingScreen extends StatelessWidget {
   const AuthLandingScreen({super.key});
 
-  Future<void> _continueWith(BuildContext context, String provider) async {
-    final store = locator<AuthStore>();
-    final ok = await store.continueWithProvider(provider);
-    if (ok && context.mounted) {
-      Navigator.of(context).pushReplacementNamed(AppRoutes.onboarding);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final store = locator<AuthStore>();
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: AppTheme.lightOverlay,
       child: Scaffold(
-        body: SafeArea(
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.gutter, AppSpacing.xl, AppSpacing.gutter, 0),
-                child: Row(
-                  children: [
-                    const AppMark(size: 40),
-                    const SizedBox(width: AppSpacing.md),
-                    Text('Florensic',
-                        style: AppText.heading20.copyWith(fontSize: 17.5)),
-                  ],
-                ),
-              ),
-              // The canopy owns the top third and fades into the ground so the
-              // headline always sits on a clear surface.
-              const Expanded(flex: 34, child: _CanopyHero()),
-              Expanded(
-                flex: 66,
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: AppSpacing.gutter),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const SizedBox(height: AppSpacing.sm),
-                      Text('Your plants,\nin one place.',
-                          style: AppText.display40.copyWith(fontSize: 35.5)),
-                      const SizedBox(height: AppSpacing.md),
-                      Text(
-                        'Discover, care for, and understand your plants.',
-                        style: AppText.body15.copyWith(fontSize: 15),
-                      ),
-                      const SizedBox(height: AppSpacing.xxl + AppSpacing.xs),
-                      Observer(
-                        builder: (context) => Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
+        // The hero runs to the very top edge — including behind the status
+        // bar — so there is no seam between the header and the body.
+        body: Stack(
+          children: [
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: MediaQuery.sizeOf(context).height * 0.58,
+              child: const _CanopyHero(),
+            ),
+            SafeArea(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.gutter,
+                      AppSpacing.xl,
+                      AppSpacing.gutter,
+                      0,
+                    ),
+                    child: Row(
+                      children: [
+                        const AppMark(size: 40),
+                        const SizedBox(width: AppSpacing.md),
+                        Text(
+                          'Florensic',
+                          style: AppText.heading20.copyWith(fontSize: 17.5),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Everything else is pinned low, which leaves the tree the top
+                  // half of the screen to itself.
+                  const Spacer(),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.gutter,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const SizedBox(height: AppSpacing.sm),
+                        Text(
+                          'Your plants,\nin one place.',
+                          style: AppText.display40.copyWith(fontSize: 35.5),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        Text(
+                          'Discover, care for, and understand your plants.',
+                          style: AppText.body15.copyWith(fontSize: 15),
+                        ),
+                        const SizedBox(height: AppSpacing.xxl + AppSpacing.xs),
+                        Observer(
+                          builder: (context) => Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              AppButton.primary(
+                                label: 'Continue with email',
+                                loading: store.isLoading,
+                                onPressed: () => Navigator.of(
+                                  context,
+                                ).pushNamed(AppRoutes.signIn),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            AppButton.dark(
-                              label: 'Continue with Apple',
-                              icon: PgIcons.apple,
-                              loading: store.isLoading,
-                              onPressed: () => _continueWith(context, 'apple'),
+                            Text(
+                              'New here?',
+                              style: AppText.body15.copyWith(fontSize: 14),
                             ),
-                            const SizedBox(height: AppSpacing.md),
-                            AppButton.outline(
-                              label: 'Continue with Google',
-                              icon: PgIcons.google,
-                              onPressed: () => _continueWith(context, 'google'),
-                            ),
-                            const SizedBox(height: AppSpacing.md),
-                            AppButton.primary(
-                              label: 'Continue with email',
-                              onPressed: () => Navigator.of(context)
-                                  .pushNamed(AppRoutes.signIn),
+                            const SizedBox(width: AppSpacing.sm),
+                            AppButton(
+                              label: 'Create an account',
+                              style: AppButtonStyle.link,
+                              expand: false,
+                              onPressed: () => Navigator.of(
+                                context,
+                              ).pushNamed(AppRoutes.signUp),
                             ),
                           ],
                         ),
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text('New here?',
-                              style: AppText.body15.copyWith(fontSize: 14)),
-                          const SizedBox(width: AppSpacing.sm),
-                          AppButton(
-                            label: 'Create an account',
-                            style: AppButtonStyle.link,
-                            expand: false,
-                            onPressed: () => Navigator.of(context)
-                                .pushNamed(AppRoutes.signUp),
+                        const SizedBox(height: AppSpacing.xl),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.md,
+                            0,
+                            AppSpacing.md,
+                            AppSpacing.lg,
                           ),
-                        ],
-                      ),
-                      const Spacer(),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                            AppSpacing.md, 0, AppSpacing.md, AppSpacing.lg),
-                        child: Text.rich(
-                          TextSpan(
-                            style: AppText.body13.copyWith(fontSize: 12),
-                            children: const [
-                              TextSpan(text: 'By continuing you agree to our '),
-                              TextSpan(
-                                text: 'Terms',
-                                style: TextStyle(
+                          child: Text.rich(
+                            TextSpan(
+                              style: AppText.body13.copyWith(fontSize: 12),
+                              children: const [
+                                TextSpan(
+                                  text: 'By continuing you agree to our ',
+                                ),
+                                TextSpan(
+                                  text: 'Terms',
+                                  style: TextStyle(
                                     decoration: TextDecoration.underline,
-                                    color: AppColors.ink),
-                              ),
-                              TextSpan(text: ' and '),
-                              TextSpan(
-                                text: 'Privacy Policy',
-                                style: TextStyle(
+                                    color: AppColors.ink,
+                                  ),
+                                ),
+                                TextSpan(text: ' and '),
+                                TextSpan(
+                                  text: 'Privacy Policy',
+                                  style: TextStyle(
                                     decoration: TextDecoration.underline,
-                                    color: AppColors.ink),
-                              ),
-                              TextSpan(text: '.'),
-                            ],
+                                    color: AppColors.ink,
+                                  ),
+                                ),
+                                TextSpan(text: '.'),
+                              ],
+                            ),
+                            textAlign: TextAlign.center,
                           ),
-                          textAlign: TextAlign.center,
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -157,13 +167,20 @@ class _CanopyHero extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Color(0xFFE4F4C8), Color(0xFFEBF6E2), AppColors.ground],
-              stops: [0, 0.6, 1],
+              colors: [Color(0xFFE4F4C8), Color(0xFFEAF5DE), AppColors.ground],
+              stops: [0, 0.55, 0.92],
             ),
           ),
         ),
-        Align(
-          alignment: Alignment.bottomCenter,
+        // A whole tree, trunk and all. The canopy cut-out reads as a fragment
+        // once it is scaled up, because it has no crown and no base.
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.gutter,
+            AppSpacing.xxxl,
+            AppSpacing.gutter,
+            0,
+          ),
           child: TweenAnimationBuilder<double>(
             tween: Tween<double>(begin: 0, end: 1),
             duration: const Duration(milliseconds: 900),
@@ -171,20 +188,19 @@ class _CanopyHero extends StatelessWidget {
             builder: (context, t, child) => Opacity(
               opacity: t,
               child: Transform.scale(
-                scale: 1.06 - t * 0.06,
+                scale: 1.04 - t * 0.04,
                 alignment: Alignment.bottomCenter,
                 child: child,
               ),
             ),
             child: Image.asset(
-              'assets/images/tree_canopy.png',
-              fit: BoxFit.cover,
-              width: double.infinity,
+              'assets/images/tree_pine.png',
+              fit: BoxFit.contain,
               alignment: Alignment.bottomCenter,
             ),
           ),
         ),
-        // Feather the photograph into the ground.
+        // Settle the trunk into the ground rather than ending it on a line.
         const Positioned(
           left: 0,
           right: 0,

@@ -9,8 +9,8 @@ import '../../theme.dart';
 ///
 /// Fills clockwise from the top. Leaf green above 70, amber 40–69, coral
 /// below 40.
-/// A paused plant shows a beaded track instead of a fill — the score stops
-/// rather than decays.
+/// A plant with no score — never scored, or shown as paused — gets a beaded
+/// track instead of a fill.
 class HealthRing extends StatelessWidget {
   const HealthRing({
     super.key,
@@ -36,7 +36,7 @@ class HealthRing extends StatelessWidget {
         HealthBand.thriving => AppColors.leaf,
         HealthBand.watch => AppColors.caution,
         HealthBand.critical => AppColors.critical,
-        HealthBand.paused => const Color(0xFFC2D5C8),
+        null => const Color(0xFFC2D5C8),
       };
 
   @override

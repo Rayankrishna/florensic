@@ -1,61 +1,36 @@
-import 'dart:developer' as developer;
-
-/// A single call passing through the client.
-class ApiRequest {
-  const ApiRequest(this.path, {this.params = const {}});
-
-  final String path;
-  final Map<String, Object?> params;
-
-  @override
-  String toString() =>
-      params.isEmpty ? path : '$path?${params.entries.map((e) => '${e.key}=${e.value}').join('&')}';
-}
-
-/// Hook points around a call.
+/// Raised for any failed call.
 ///
-/// The app currently talks to a mock backend, but every repository goes through
-/// this chain so swapping in a real HTTP client changes one class, not many.
-abstract class ApiInterceptor {
-  const ApiInterceptor();
-
-  Future<void> onRequest(ApiRequest request) async {}
-
-  Future<void> onResponse(ApiRequest request, Object? response) async {}
-
-  Future<void> onError(ApiRequest request, Object error) async {}
-}
-
-/// Writes calls to the Dart timeline / console in debug builds.
-class LoggingInterceptor extends ApiInterceptor {
-  const LoggingInterceptor();
-
-  @override
-  Future<void> onRequest(ApiRequest request) async {
-    developer.log('→ $request', name: 'api');
-  }
-
-  @override
-  Future<void> onError(ApiRequest request, Object error) async {
-    developer.log('✗ $request — $error', name: 'api', error: error);
-  }
-}
-
-/// Gives mock responses a believable delay so loading states are real.
-class LatencyInterceptor extends ApiInterceptor {
-  const LatencyInterceptor({this.duration = const Duration(milliseconds: 620)});
-
-  final Duration duration;
-
-  @override
-  Future<void> onRequest(ApiRequest request) => Future<void>.delayed(duration);
-}
-
-/// Thrown by repositories when a mock call is configured to fail.
+/// [code] is the backend's stable error code from the `{"error": {...}}`
+/// envelope, so stores can branch on it without matching prose. The typed
+/// providers throw it; the auth provider wraps it in an `ApiResponse`.
 class ApiException implements Exception {
-  const ApiException(this.message);
+  const ApiException(this.message, {this.code, this.statusCode});
 
   final String message;
+  final String? code;
+  final int? statusCode;
+
+  bool get isOffline => code == 'offline';
+
+  bool get isRateLimited => code == 'rate_limited' || statusCode == 429;
+
+  /// `notes` or `water/skip` on a paused plant.
+  bool get isPlantNotActive => code == 'plant_not_active';
+
+  /// `resume` on a plant that is active or stale. On a stale plant it means
+  /// "check in instead".
+  bool get isPlantNotPaused => code == 'plant_not_paused';
+
+  /// The treatment or plan was already closed, or is not ours any more.
+  bool get isTreatmentGone =>
+      code == 'treatment_not_open' ||
+      code == 'treatment_not_found' ||
+      code == 'course_not_open' ||
+      code == 'course_not_found';
+
+  bool get isTaskNotSkippable => code == 'task_not_skippable';
+
+  bool get isInvalidTimezone => code == 'invalid_timezone';
 
   @override
   String toString() => message;

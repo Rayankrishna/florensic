@@ -65,49 +65,55 @@ class ScanResultScreen extends StatelessWidget {
                               tint: const Color(0xFF050D05),
                               inset: 0.04,
                             ),
-                            SafeArea(
-                              child: Padding(
-                                padding: const EdgeInsets.fromLTRB(
-                                    AppSpacing.gutter,
-                                    AppSpacing.md,
-                                    AppSpacing.gutter,
-                                    0),
-                                child: Row(
-                                  children: [
-                                    CircleIconButton(
-                                      icon: PgIcons.chevronLeft,
-                                      background: const Color(0x33FFFFFF),
-                                      foreground: Colors.white,
-                                      elevated: false,
-                                      onPressed: () {
-                                        store.resetScan();
-                                        Navigator.of(context).maybePop();
-                                      },
-                                    ),
-                                    const Spacer(),
-                                    TweenAnimationBuilder<double>(
-                                      tween:
-                                          Tween<double>(begin: 0.85, end: 1),
-                                      duration:
-                                          const Duration(milliseconds: 420),
-                                      curve: Curves.easeOutBack,
-                                      builder: (context, t, child) =>
-                                          Transform.scale(
-                                              scale: t, child: child),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: AppSpacing.xl,
-                                            vertical: 13),
-                                        decoration: const BoxDecoration(
-                                          color: AppColors.leaf,
-                                          borderRadius: AppRadius.pillR,
-                                        ),
-                                        child: Text('Match found',
-                                            style: AppText.heading17
-                                                .copyWith(fontSize: 16)),
+                            Positioned(
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              child: SafeArea(
+                                bottom: false,
+                                child: Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                      AppSpacing.gutter,
+                                      AppSpacing.md,
+                                      AppSpacing.gutter,
+                                      0),
+                                  child: Row(
+                                    children: [
+                                      CircleIconButton(
+                                        icon: PgIcons.chevronLeft,
+                                        background: const Color(0x33FFFFFF),
+                                        foreground: Colors.white,
+                                        elevated: false,
+                                        onPressed: () {
+                                          store.resetScan();
+                                          Navigator.of(context).maybePop();
+                                        },
                                       ),
-                                    ),
-                                  ],
+                                      const Spacer(),
+                                      TweenAnimationBuilder<double>(
+                                        tween:
+                                            Tween<double>(begin: 0.85, end: 1),
+                                        duration:
+                                            const Duration(milliseconds: 420),
+                                        curve: Curves.easeOutBack,
+                                        builder: (context, t, child) =>
+                                            Transform.scale(
+                                                scale: t, child: child),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: AppSpacing.xl,
+                                              vertical: 13),
+                                          decoration: const BoxDecoration(
+                                            color: AppColors.leaf,
+                                            borderRadius: AppRadius.pillR,
+                                          ),
+                                          child: Text('Match found',
+                                              style: AppText.heading17
+                                                  .copyWith(fontSize: 16)),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),

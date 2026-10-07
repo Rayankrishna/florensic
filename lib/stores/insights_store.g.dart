@@ -9,6 +9,22 @@ part of 'insights_store.dart';
 // ignore_for_file: non_constant_identifier_names, unnecessary_brace_in_string_interps, unnecessary_lambdas, prefer_expression_function_bodies, lines_longer_than_80_chars, avoid_as, avoid_annotating_with_dynamic, no_leading_underscores_for_local_identifiers
 
 mixin _$InsightsStore on _InsightsStore, Store {
+  Computed<bool>? _$weatherUnavailableComputed;
+
+  @override
+  bool get weatherUnavailable =>
+      (_$weatherUnavailableComputed ??= Computed<bool>(
+        () => super.weatherUnavailable,
+        name: '_InsightsStore.weatherUnavailable',
+      )).value;
+  Computed<bool>? _$historyUnavailableComputed;
+
+  @override
+  bool get historyUnavailable =>
+      (_$historyUnavailableComputed ??= Computed<bool>(
+        () => super.historyUnavailable,
+        name: '_InsightsStore.historyUnavailable',
+      )).value;
   Computed<bool>? _$isLoadingComputed;
 
   @override
@@ -137,6 +153,24 @@ mixin _$InsightsStore on _InsightsStore, Store {
     });
   }
 
+  late final _$attributionAtom = Atom(
+    name: '_InsightsStore.attribution',
+    context: context,
+  );
+
+  @override
+  String get attribution {
+    _$attributionAtom.reportRead();
+    return super.attribution;
+  }
+
+  @override
+  set attribution(String value) {
+    _$attributionAtom.reportWrite(value, super.attribution, () {
+      super.attribution = value;
+    });
+  }
+
   late final _$stateAtom = Atom(name: '_InsightsStore.state', context: context);
 
   @override
@@ -190,8 +224,11 @@ insights: ${insights},
 environmentHistory: ${environmentHistory},
 correlation: ${correlation},
 homeInsight: ${homeInsight},
+attribution: ${attribution},
 state: ${state},
 errorMessage: ${errorMessage},
+weatherUnavailable: ${weatherUnavailable},
+historyUnavailable: ${historyUnavailable},
 isLoading: ${isLoading},
 newInsightCount: ${newInsightCount},
 city: ${city},

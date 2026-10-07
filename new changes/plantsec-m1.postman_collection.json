@@ -1,0 +1,2089 @@
+{
+  "info": {
+    "name": "Plantsec M1 — Florensic backend",
+    "_postman_id": "8a4d1d3e-6f2b-4c1e-9c0a-5e7f1a2b3c4d",
+    "description": "Milestone M1 of the Florensic backend: auth, /me, species catalogue, plants, care actions, today's tasks.\n\nRun the folders top to bottom. Requests save what later requests need (tokens, species_id, plant_id, task_id) into collection variables automatically.\n\nThe only manual step: after '1.1 Sign up', copy the 6-digit OTP from the API logs into the `otp_code` variable (see docs/testing-in-postman.md).\n\nErrors always look like {\"error\": {\"code\": \"...\", \"message\": \"...\"}}.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8010"
+    },
+    {
+      "key": "email",
+      "value": "demo@example.com"
+    },
+    {
+      "key": "password",
+      "value": "plantgram1"
+    },
+    {
+      "key": "new_password",
+      "value": "newpassword9"
+    },
+    {
+      "key": "otp_code",
+      "value": ""
+    },
+    {
+      "key": "access_token",
+      "value": ""
+    },
+    {
+      "key": "refresh_token",
+      "value": ""
+    },
+    {
+      "key": "species_id",
+      "value": ""
+    },
+    {
+      "key": "plant_id",
+      "value": ""
+    },
+    {
+      "key": "task_id",
+      "value": ""
+    },
+    {
+      "key": "photo_id",
+      "value": ""
+    },
+    {
+      "key": "job_id",
+      "value": ""
+    },
+    {
+      "key": "identified_species_id",
+      "value": ""
+    },
+    {
+      "key": "checkin_photo_id",
+      "value": ""
+    },
+    {
+      "key": "checkin_job_id",
+      "value": ""
+    },
+    {
+      "key": "suggest_source",
+      "value": ""
+    },
+    {
+      "key": "suggest_external_id",
+      "value": ""
+    },
+    {
+      "key": "suggest_scientific_name",
+      "value": ""
+    },
+    {
+      "key": "suggest_matched_term",
+      "value": ""
+    },
+    {
+      "key": "suggest_species_id",
+      "value": ""
+    },
+    {
+      "key": "resolved_species_id",
+      "value": ""
+    },
+    {
+      "key": "resolve_body",
+      "value": ""
+    },
+    {
+      "key": "treatment_id",
+      "value": ""
+    },
+    {
+      "key": "course_id",
+      "value": ""
+    },
+    {
+      "key": "tstep_task_id",
+      "value": ""
+    }
+  ],
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Collection-wide: every error must use the envelope",
+          "if (pm.response.code >= 400) {",
+          "  pm.test('error uses envelope {error:{code,message}}', function () {",
+          "    const b = pm.response.json();",
+          "    pm.expect(b).to.have.property('error');",
+          "    pm.expect(b.error).to.have.property('code');",
+          "    pm.expect(b.error).to.have.property('message');",
+          "  });",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "0 Health",
+      "item": [
+        {
+          "name": "0.1 GET /health",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "url": "{{baseUrl}}/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 and status ok', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().status).to.eql('ok');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1 Auth",
+      "item": [
+        {
+          "name": "1.1 Sign up (sends OTP)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/auth/sign-up",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Demo\",\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "description": "202 Accepted. The OTP is emailed; with EMAIL_BACKEND=console it is printed in the API logs:\n\n    docker compose logs api --tail 50 | grep 'code is'\n\nCopy the 6 digits into the `otp_code` collection variable, then run 1.2.\n\n409 email_taken if this email already has a verified account (then run 1.3 Sign in instead)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('202 Accepted (or 409 if already verified)', function () {",
+                  "  pm.expect([202, 409]).to.include(pm.response.code);",
+                  "});",
+                  "if (pm.response.code === 202) {",
+                  "  console.log('Now copy the OTP from: docker compose logs api --tail 50 | grep \"code is\"');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.2 Verify OTP → tokens",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/auth/otp/verify",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"code\": \"{{otp_code}}\"\n}"
+            },
+            "description": "Verifies the email and returns an access token (15 min) and refresh token (30 days). Saves both to variables.\n\nErrors: otp_invalid, otp_expired (10 min), otp_locked (5 wrong attempts)."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('otp_code')) {",
+                  "  console.warn('otp_code is empty — set it from the API logs first');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 with token pair', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.token_type).to.eql('bearer');",
+                  "  pm.expect(b.expires_in).to.eql(900);",
+                  "  pm.collectionVariables.set('access_token', b.access_token);",
+                  "  pm.collectionVariables.set('refresh_token', b.refresh_token);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.3 Sign in (email + password)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/auth/sign-in",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "description": "Works only after the email is verified (403 email_unverified otherwise). 401 invalid_credentials on a wrong password. Saves tokens."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 with token pair', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const b = pm.response.json();",
+                  "  pm.collectionVariables.set('access_token', b.access_token);",
+                  "  pm.collectionVariables.set('refresh_token', b.refresh_token);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.4 Refresh tokens (rotates)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/auth/refresh",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+            },
+            "description": "Returns a NEW pair and revokes the old refresh token. Sending the old token again returns 401 token_reused and revokes the whole family (try it: run this request twice quickly without re-running 1.3)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 and refresh token rotated', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.refresh_token).to.not.eql(pm.collectionVariables.get('refresh_token'));",
+                  "  pm.collectionVariables.set('access_token', b.access_token);",
+                  "  pm.collectionVariables.set('refresh_token', b.refresh_token);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.5 Request OTP for password reset",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/auth/otp/request",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"purpose\": \"reset\"\n}"
+            },
+            "description": "Always 204, whether or not the account exists (no enumeration). purpose ∈ signup | signin | reset. Limit 5 codes per hour per email (429 rate_limited). Copy the new code from the logs into `otp_code` before 1.6."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.6 Reset password with code",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/auth/password/reset",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"code\": \"{{otp_code}}\",\n  \"new_password\": \"{{new_password}}\"\n}"
+            },
+            "description": "204. Requires a code requested with purpose=reset. Revokes all refresh tokens; sign in again with the new password (update the `password` variable)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', function () { pm.response.to.have.status(204); });",
+                  "if (pm.response.code === 204) {",
+                  "  pm.collectionVariables.set('password', pm.collectionVariables.get('new_password'));",
+                  "  console.log('password variable updated to new_password; run 1.3 Sign in again');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.7 Sign out (revoke refresh token)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/auth/sign-out",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+            },
+            "description": "Needs the bearer token. Revokes the given refresh token, or all of the user's refresh tokens if the body is {}. The access token keeps working until it expires (15 min)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.8 OAuth Google (fixture token, dev only)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/auth/oauth/google",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_token\": \"{{fixture_id_token}}\",\n  \"name\": \"Gee\"\n}"
+            },
+            "description": "Only works when the API runs with OAUTH_BACKEND=fixture (unsigned tokens are trusted). The pre-request script builds an HS256 token with sub/email/email_verified claims. With OAUTH_BACKEND=jwks (the default) a real Google/Apple id_token is required and this request returns 401 oauth_invalid.\n\nProviders: google | apple. Unknown → 404 unknown_provider."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "function b64url(s) { return CryptoJS.enc.Base64.stringify(s).replace(/=+$/, '').replace(/\\+/g, '-').replace(/\\//g, '_'); }",
+                  "const header = b64url(CryptoJS.enc.Utf8.parse(JSON.stringify({alg: 'HS256', typ: 'JWT'})));",
+                  "const payload = b64url(CryptoJS.enc.Utf8.parse(JSON.stringify({",
+                  "  iss: 'https://accounts.google.com', aud: 'test', sub: 'google-sub-1',",
+                  "  email: 'oauth-' + pm.collectionVariables.get('email'), email_verified: true, name: 'Gee'",
+                  "})));",
+                  "const sig = b64url(CryptoJS.HmacSHA256(header + '.' + payload, 'unsigned-fixture-key-0123456789abcdef-long'));",
+                  "pm.collectionVariables.set('fixture_id_token', header + '.' + payload + '.' + sig);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 with fixture backend, 401 oauth_invalid with jwks backend', function () {",
+                  "  pm.expect([200, 401]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2 Me",
+      "item": [
+        {
+          "name": "2.1 GET /me",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/me"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 with profile and stats', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.email).to.eql(pm.collectionVariables.get('email'));",
+                  "  pm.expect(b.stats).to.have.keys('plants_kept', 'under_active_care', 'average_health', 'care_streak_weeks');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2.2 PATCH /me",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/me",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"city\": \"Mumbai\",\n  \"units\": \"metric\",\n  \"reminder_time\": \"07:30\",\n  \"consent_training\": true,\n  \"timezone\": \"Asia/Kolkata\"\n}"
+            },
+            "description": "All fields optional. units ∈ metric | imperial. reminder_time is HH:MM (422 otherwise). Explicit null is ignored for every field except city. `timezone` is an IANA name (422 invalid_timezone otherwise); every 'today' the API decides for you — tasks, check-in windows, health points — is on this calendar."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 and fields updated', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().city).to.eql('Mumbai');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2.3 PUT /me/devices (push token)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/me/devices",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"platform\": \"android\",\n  \"push_token\": \"fcm-demo-token-0001\"\n}"
+            },
+            "description": "Idempotent. Re-sending the same push_token updates last_seen_at."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3 Species (public)",
+      "item": [
+        {
+          "name": "3.1 List species (saves species_id)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/v1/species?limit=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "species"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "5",
+                  "description": "1–100, default 50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "description": "next_cursor from the previous page",
+                  "disabled": true
+                },
+                {
+                  "key": "q",
+                  "value": "",
+                  "description": "search Latin or common names",
+                  "disabled": true
+                },
+                {
+                  "key": "traits",
+                  "value": "",
+                  "description": "comma list: indoor,low_light,beginner,pet_friendly",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Public. Returns {items, total, next_cursor}. Saves the first item's id to species_id for 4.1."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 with items and total', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.items.length).to.be.above(0);",
+                  "  pm.collectionVariables.set('species_id', b.items[0].id);",
+                  "  console.log('species_id =', b.items[0].id, b.items[0].latin_name, '| total', b.total);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.2 Search + trait filter",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/v1/species?q=monst&traits=indoor",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "species"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "monst"
+                },
+                {
+                  "key": "traits",
+                  "value": "indoor"
+                }
+              ]
+            },
+            "description": "Unknown trait → 400 invalid_trait. Bad cursor → 400 invalid_cursor."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.3 Featured species (plant of the week)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/species/featured"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 with latin_name', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json()).to.have.property('latin_name');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.4 Species by id",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/species/{{species_id}}"
+          },
+          "description": "Full card: common_name(s), latin_name, summary, difficulty, light, water, temperature, humidity, tags, traits, common_issues, care_tips, default_care. Unknown id → 404 species_not_found.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 with default_care', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().default_care).to.have.keys('watering_interval_days', 'water_amount_ml', 'check_in_interval_days');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.5 Suggest species (typeahead)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/v1/species/suggest?q=tulsi&limit=8",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "species",
+                "suggest"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "tulsi",
+                  "description": "2-80 characters; under 2 -> 422"
+                },
+                {
+                  "key": "limit",
+                  "value": "8",
+                  "description": "1-20, default 8"
+                }
+              ]
+            },
+            "description": "Public. For the moment someone decides an identification is wrong and starts typing the name they meant. Returns {items, query}.\n\nOur own catalogue is matched first (scientific name, common names and recorded synonyms, case-insensitive), ranked prefix > word start > substring; those rows carry source=\"catalogue\" and a species_id you can pass straight to 3.4 or 4.1. iNaturalist fills the rest of the list with plants we don't carry yet: source=\"inaturalist\", species_id null, external_id set — hand either kind to 8b.2 to get a species_id.\n\nEvery row is a species. A genus (\"Monstera\") is never suggested: nobody owns a genus, and a care card written for thirty plants at once helps no one.\n\nmatched_term is the name the query actually matched, so \"tulsi\" comes back with matched_term \"Tulsi\" — show it, or the suggestion looks like a non sequitur.\n\nTwo things to know. Queries shorter than three characters are answered from the catalogue alone (iNaturalist allows ~60 requests a minute for our whole server). And the endpoint learns: when iNaturalist names a plant we already carry, the row comes back as ours, with its species_id, and the word you typed is remembered as one of that species' common names — so the next person who types it matches our catalogue directly."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 with suggestions', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.query).to.eql('tulsi');",
+                  "  pm.expect(b.items.length).to.be.above(0);",
+                  "  b.items.forEach(function (i) {",
+                  "    pm.expect(['catalogue', 'inaturalist']).to.include(i.source);",
+                  "  });",
+                  "  console.log(b.items.map(function (i) {",
+                  "    return i.source + ': ' + i.scientific_name + ' (' + i.matched_term + ')';",
+                  "  }).join('\\n'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4 Plants",
+      "item": [
+        {
+          "name": "4.1 Create plant (saves plant_id)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/plants",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"species_id\": \"{{species_id}}\",\n  \"nickname\": \"Monty\",\n  \"room\": \"Living room\",\n  \"indoor\": true\n}"
+            },
+            "description": "201 with the full Plant. Defaults: watering every 7 days (or the species baseline), 220 ml, check-in every 14 days, reminders on at 08:00. Since the health-score cutover there is no starting score: `health_score` and `health_band` are null until something scores the plant, which for a plant kept with `photo_id` is the identification itself and otherwise the first check-in. Unknown species → 404 species_not_found."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 with defaults', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.health_score).to.eql(null);",
+                  "  pm.expect(b.health_band).to.eql(null);",
+                  "  pm.expect(b.care_history[0].type).to.eql('added');",
+                  "  pm.collectionVariables.set('plant_id', b.id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.2 List my plants",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/plants"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 array', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json()).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.3 Get plant",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/plants/{{plant_id}}"
+          },
+          "description": "Another user's plant or a deleted plant → 404 plant_not_found.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.4 Patch plant",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/plants/{{plant_id}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"room\": \"Kitchen\",\n  \"indoor\": false,\n  \"visibility\": \"public\"\n}"
+            },
+            "description": "Fields: nickname, room, indoor, visibility (private|public), light_status (good|watch|bad|neutral), light_detail. Explicit null is ignored."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 and room changed', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().room).to.eql('Kitchen');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.5 Health history",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/v1/plants/{{plant_id}}/history?range=30d",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "plants",
+                "{{plant_id}}",
+                "history"
+              ],
+              "query": [
+                {
+                  "key": "range",
+                  "value": "30d",
+                  "description": "7d | 30d | 90d"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 array of {date, score}', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.6 Care events timeline",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/plants/{{plant_id}}/care-events"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5 Care",
+      "item": [
+        {
+          "name": "5.1 Water now",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/plants/{{plant_id}}/water",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount_ml\": 250\n}"
+            },
+            "description": "Records the watering, rolls next_watering forward by frequency_days and logs a 'Watered · 250 ml' event. Since the health-score cutover a watering does not move the score (care is `care_score`'s business). Optional \"at\" (ISO datetime, not in the future → 400 invalid_time)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200, watered event on top', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().care_history[0].type).to.eql('watered');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.2 Water backdated 8 days (makes a task due)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/plants/{{plant_id}}/water",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"at\": \"{{eight_days_ago}}\"\n}"
+            },
+            "description": "Demo helper: pretends the last watering was 8 days ago, so next_watering lands in the past and 5.4 Today shows an overdue watering task."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const d = new Date(Date.now() - 8 * 24 * 3600 * 1000);",
+                  "pm.collectionVariables.set('eight_days_ago', d.toISOString());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 and next_watering is in the past', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const next = pm.response.json().schedule.next_watering;",
+                  "  pm.expect(new Date(next) < new Date()).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.3 Edit schedule",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/plants/{{plant_id}}/schedule",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"frequency_days\": 5,\n  \"next_water_amount_ml\": 200,\n  \"check_in_interval_days\": 10,\n  \"reminder_time\": \"20:00\",\n  \"watering_reminder\": true,\n  \"check_in_reminder\": false\n}"
+            },
+            "description": "All fields optional. next_watering is recomputed from the last watering (never earlier than today)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 and frequency 5', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().schedule.frequency_days).to.eql(5);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.4 Today's care tasks (saves task_id)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/care/today"
+          },
+          "description": "Watering tasks appear when next_watering ≤ today; check-in tasks when the check-in window has opened. Ids follow the app convention task-water-<plantId> / task-cond-<plantId>. Overdue first, done last. Empty array if nothing is due — run 5.2 first for the demo.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 array', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b).to.be.an('array');",
+                  "  if (b.length) { pm.collectionVariables.set('task_id', b[0].id); console.log('task_id =', b[0].id); }",
+                  "  else { console.warn('No tasks due today. Run 5.2 (backdated watering) then this again.'); }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.5 Complete task",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/v1/care/tasks/{{task_id}}/complete",
+            "description": "Completing a watering task waters the plant (schedule moves, score unchanged since the cutover). Unknown or not-today id → 404 task_not_found. Idempotent."
+          },
+          "description": "Completing a watering task waters the plant (score +2 when overdue). Unknown or not-today id → 404 task_not_found. Idempotent.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 and done', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().done).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.6 Resume care (expects 409 on an active plant)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/v1/plants/{{plant_id}}/resume"
+          },
+          "description": "Only valid for a paused plant (care_status = paused, which M3's missed-check-in job will set). On an active plant this returns 409 plant_not_paused — shown here to demonstrate the error envelope.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('409 plant_not_paused on an active plant', function () {",
+                  "  pm.response.to.have.status(409);",
+                  "  pm.expect(pm.response.json().error.code).to.eql('plant_not_paused');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6 Photos & identification",
+      "item": [
+        {
+          "name": "6.1 Upload photo for identification (saves photo_id, job_id)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/v1/photos",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "purpose",
+                  "value": "identify",
+                  "type": "text"
+                },
+                {
+                  "key": "framing",
+                  "value": "whole_plant",
+                  "type": "text"
+                },
+                {
+                  "key": "source",
+                  "value": "camera",
+                  "type": "text"
+                },
+                {
+                  "key": "lat",
+                  "value": "12.9716",
+                  "type": "text",
+                  "description": "Capture latitude — gives the plant exact coordinates (D45) so weather, home cell and insights work. Remove for an unlocated upload."
+                },
+                {
+                  "key": "lon",
+                  "value": "77.5946",
+                  "type": "text",
+                  "description": "Capture longitude."
+                },
+                {
+                  "key": "location_accuracy_m",
+                  "value": "25",
+                  "type": "text",
+                  "description": "GPS accuracy in metres (optional)."
+                }
+              ]
+            },
+            "description": "202 Accepted. Enqueues a Mode A identification job and returns {photo_id, job_id}. purpose=identify does not require plant_id."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('202 with photo_id and job_id', function () {",
+                  "  pm.response.to.have.status(202);",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.photo_id).to.be.a('string');",
+                  "  pm.expect(b.job_id).to.be.a('string');",
+                  "  pm.collectionVariables.set('photo_id', b.photo_id);",
+                  "  pm.collectionVariables.set('job_id', b.job_id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6.2 Poll analysis job (saves identified_species_id when done)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/analysis/{{job_id}}",
+            "description": "Poll every ~1s for up to ~60s. state moves queued -> running -> done | no_confident_match | failed. When done, species/confidence/rationale/initial_health are populated."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('valid state', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(['done', 'no_confident_match', 'queued', 'running']).to.include(b.state);",
+                  "  if (b.state === 'done' && b.species) {",
+                  "    pm.collectionVariables.set('identified_species_id', b.species.id);",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6.3 Get photo",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/photos/{{photo_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6.4 Create plant from identified photo (saves plant_id)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/plants",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"species_id\": \"{{identified_species_id}}\",\n  \"nickname\": \"From photo\",\n  \"photo_id\": \"{{photo_id}}\"\n}"
+            },
+            "description": "201 with the full Plant; photo_count is 1 and the uploaded photo is linked to the new plant."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 with photo linked', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.photo_count).to.eql(1);",
+                  "  pm.collectionVariables.set('plant_id', b.id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6.5 List plant photos",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/plants/{{plant_id}}/photos"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 array containing the photo', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b).to.be.an('array');",
+                  "  pm.expect(b.map(p => p.id)).to.include(pm.collectionVariables.get('photo_id'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "7 Care plan",
+      "item": [
+        {
+          "name": "7.1 Get care plan",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/plants/{{plant_id}}/care-plan"
+          },
+          "description": "Current care plan: pending items, latest_insight, schedule (frequency_days, water_amount_ml, check_in_interval_days, check_in_window_days, next_watering, check_in_window_opens), and meta (attribution, timezone). Plant has no plan yet → 404 care_plan_not_found.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 with revision_id and latest_insight.headline', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.revision_id).to.be.a('string').and.not.empty;",
+                  "  pm.expect(b.latest_insight.headline).to.be.a('string').and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8 Check-ins & insights",
+      "description": "M3b: check a plant in with a photo and your own verdict, poll the job, and read the daily insights feed. Needs an existing {{plant_id}} (folder 4 or 6.4).",
+      "item": [
+        {
+          "name": "8.1 Upload check-in photo (saves checkin_photo_id)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/v1/photos",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "purpose",
+                  "value": "checkin",
+                  "type": "text"
+                },
+                {
+                  "key": "plant_id",
+                  "value": "{{plant_id}}",
+                  "type": "text"
+                },
+                {
+                  "key": "framing",
+                  "value": "whole_plant",
+                  "type": "text"
+                },
+                {
+                  "key": "source",
+                  "value": "camera",
+                  "type": "text"
+                },
+                {
+                  "key": "lat",
+                  "value": "12.9716",
+                  "type": "text",
+                  "description": "Capture latitude — gives the plant exact coordinates (D45) so weather, home cell and insights work. Remove for an unlocated upload."
+                },
+                {
+                  "key": "lon",
+                  "value": "77.5946",
+                  "type": "text",
+                  "description": "Capture longitude."
+                },
+                {
+                  "key": "location_accuracy_m",
+                  "value": "25",
+                  "type": "text",
+                  "description": "GPS accuracy in metres (optional)."
+                }
+              ]
+            },
+            "description": "202 Accepted with {photo_id, job_id}. purpose=checkin requires plant_id, and unlike an identify upload it does NOT run the job: the check-in waits for your own verdict in 8.2. The analysis quota is counted here, once."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('202 with photo_id', function () {",
+                  "  pm.response.to.have.status(202);",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.photo_id).to.be.a('string');",
+                  "  pm.collectionVariables.set('checkin_photo_id', b.photo_id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "8.2 POST condition update (saves checkin_job_id)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/plants/{{plant_id}}/condition-updates",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"photo_id\": \"{{checkin_photo_id}}\",\n  \"user_verdict\": \"healthy\",\n  \"observations\": [\"looks fine\"],\n  \"note\": \"\"\n}"
+            },
+            "description": "202 Accepted with {job_id, update_pending: true}. This is what actually runs the check-in. Re-posting the same photo returns 409 photo_already_used; a photo uploaded with purpose=identify returns 400 photo_wrong_purpose."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('202 with update_pending', function () {",
+                  "  pm.response.to.have.status(202);",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.update_pending).to.eql(true);",
+                  "  pm.collectionVariables.set('checkin_job_id', b.job_id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "8.3 Poll check-in job",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/analysis/{{checkin_job_id}}",
+            "description": "Poll every ~2s for up to ~3 min (a check-in is a vision call plus a care-plan revision). When state is done the response carries a checkin block: plant, update, score_delta, next_check_in, plan_revision_id."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('valid state, and a complete checkin block when done', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(['done', 'queued', 'running']).to.include(b.state);",
+                  "  if (b.state === 'done') {",
+                  "    pm.expect(['healthy', 'concerns', 'needs_attention']).to.include(b.checkin.update.model_verdict);",
+                  "    pm.expect(b.checkin.update.score_after).to.be.within(1, 100);",
+                  "    pm.expect(b.checkin.next_check_in).to.be.a('string').and.not.empty;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "8.4 Resume plant (409 on an active plant)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/plants/{{plant_id}}/resume",
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "description": "Resuming a paused plant returns 200 with care_status active, the score it already had (since the cutover a resume no longer throws it back to 70 — the returning check-in is believed outright instead), and a fresh care-plan revision with trigger 'resumed'. The plant you have been testing with is active, so this request is expected to return 409 plant_not_paused. No endpoint pauses a plant: PATCH /v1/plants/{id} does not accept care_status, and a plant is paused only by the 03:00 UTC care.missed_check_ins sweep when a check-in window closes with no update. To see the 200, either let that sweep run, or pause the plant by hand: docker compose exec -T postgres psql -U plantsec -d plantsec -c \"update plants set care_status='paused' where id='<plant_id>'\" (credentials from docker-compose.yml). A paused plant keeps its number and loses its band: `health_score` stands and `health_band` is null."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('409 plant_not_paused on an already-active plant', function () {",
+                  "  pm.response.to.have.status(409);",
+                  "  pm.expect(pm.response.json().error.code).to.eql('plant_not_paused');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "8.5 GET insights",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/insights",
+            "description": "200 with items (today and the 29 days before it, newest first), correlation (null until there is enough history, or when you have no home cell), and meta (attribution, timezone). Insights are drafted by the nightly beat sweep, so items is empty on a fresh account."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 with the Open-Meteo attribution', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.items).to.be.an('array');",
+                  "  pm.expect(b.meta.attribution).to.eql('Weather data by Open-Meteo.com (CC BY 4.0)');",
+                  "  pm.expect(b.meta.timezone).to.eql('UTC');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "8.6 Care plan after the check-in (revision trigger condition_update)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/plants/{{plant_id}}/care-plan",
+            "description": "Same call as 7.1, after 8.3 reached done: `revisions[0].trigger` is `condition_update` and `prompt_version` is `v2`; items the model retired are `superseded`, new ones `pending`. After 8.4 on a paused plant the newest revision's trigger is `resumed`."
+          },
+          "description": "Current care plan: pending items, latest_insight, schedule (frequency_days, water_amount_ml, check_in_interval_days, check_in_window_days, next_watering, check_in_window_opens), and meta (attribution, timezone). Plant has no plan yet → 404 care_plan_not_found."
+        }
+      ]
+    },
+    {
+      "name": "8b Correct a plant's species",
+      "description": "The owner says the identification is wrong. Search a name (8b.1), turn the row they picked into a species_id (8b.2), correct the plant (8b.3), and watch the care plan follow (8b.4).\n\n8b.2 is the only slow step, and only the first time anyone resolves a given plant: drafting a species we don't carry is one text-model call, about ten seconds, and answers 201. Every later resolve of that plant — by anyone, under any of its names — is a lookup that answers 200.",
+      "item": [
+        {
+          "name": "8b.1 Suggest (tulsi)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/v1/species/suggest?q=tulsi&limit=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "species",
+                "suggest"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "tulsi",
+                  "description": "2-80 characters"
+                },
+                {
+                  "key": "limit",
+                  "value": "5",
+                  "description": "1-20, default 8"
+                }
+              ]
+            },
+            "description": "Same call as 3.5, kept here so this folder runs on its own. The test script saves the first row whole — source, external_id, scientific_name, matched_term and species_id — because 8b.2 sends a suggestion back exactly as it was received."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 with at least one suggestion', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.items.length).to.be.above(0);",
+                  "  const first = b.items[0];",
+                  "  pm.collectionVariables.set('suggest_source', first.source);",
+                  "  pm.collectionVariables.set('suggest_external_id', first.external_id || '');",
+                  "  pm.collectionVariables.set('suggest_scientific_name', first.scientific_name);",
+                  "  pm.collectionVariables.set('suggest_matched_term', first.matched_term || '');",
+                  "  pm.collectionVariables.set('suggest_species_id', first.species_id || '');",
+                  "  console.log(first.source + ': ' + first.scientific_name +",
+                  "              ' (' + first.matched_term + ')');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "8b.2 Resolve to a species_id",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/species/resolve",
+            "body": {
+              "mode": "raw",
+              "raw": "{{resolve_body}}"
+            },
+            "description": "Auth. Sends the suggestion 8b.1 saved, back as it came:\n\n{\"source\": \"inaturalist\", \"species_id\": null, \"external_id\": \"181060\",\n \"scientific_name\": \"Ocimum tenuiflorum\", \"matched_term\": \"Tulsi\"}\n\nThe pre-request script assembles that from the saved variables, because a catalogue row carries a species_id and no external_id and an iNaturalist row the other way round, and those have to go over as null rather than \"\".\n\nAuth. 200 when we already have the plant, 201 when this call drafted it — allow about ten seconds for a 201, which is one text-model call writing the care card. Answers {species_id, scientific_name, created}.\n\nA drafted species arrives knowing every name iNaturalist has for it, in every language, plus the word you typed. Run 8b.1 and 8b.2 again with a different name for the same plant and you get the same species_id back with created=false: it is never drafted twice.\n\n503 species_draft_unavailable means the model, GBIF or the day's budget said no; retry later. 429 species_draft_quota_exceeded means this account has drafted its five new species for the day — plants we already carry still resolve. A catalogue row whose species we no longer have is 404 species_not_found, and a scientific_name that is not a name at all is 422."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// A suggestion, sent back as it arrived: the fields that were absent go",
+                  "// over as null, not as an empty string.",
+                  "const v = function (name) {",
+                  "  const value = pm.collectionVariables.get(name);",
+                  "  return value ? value : null;",
+                  "};",
+                  "pm.collectionVariables.set('resolve_body', JSON.stringify({",
+                  "  source: pm.collectionVariables.get('suggest_source'),",
+                  "  species_id: v('suggest_species_id'),",
+                  "  external_id: v('suggest_external_id'),",
+                  "  scientific_name: pm.collectionVariables.get('suggest_scientific_name'),",
+                  "  matched_term: v('suggest_matched_term'),",
+                  "}, null, 2));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('resolved to a species_id', function () {",
+                  "  pm.expect([200, 201]).to.include(pm.response.code);",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.species_id).to.be.a('string');",
+                  "  pm.collectionVariables.set('resolved_species_id', b.species_id);",
+                  "  console.log((b.created ? 'drafted ' : 'already had ') + b.scientific_name);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "8b.3 Correct the plant's species",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/v1/plants/{{plant_id}}/species",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"species_id\": \"{{resolved_species_id}}\"\n}"
+            },
+            "description": "Auth, owner only. 200 with the full Plant under its new species, so you can replace local state from the response.\n\nIt also writes a species_corrected care event (\"old name → new name\", visible in 4.6), relabels this plant's training rows with what the owner said, and asks for a fresh care plan. Sending the species the plant already has is a no-op: same 200, no event, no revision — so confirming an identification and correcting it are the same call.\n\n404 plant_not_found (not yours) or species_not_found."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 with the corrected species', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.species.id).to.eql(pm.collectionVariables.get('resolved_species_id'));",
+                  "  console.log('plant is now ' + b.species.latin_name);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "8b.4 Care plan after correction",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/plants/{{plant_id}}/care-plan",
+            "description": "Same call as 7.1. The newest revision's trigger is species_corrected and its rationale explains the plan was rewritten for the plant the owner says this is. If the revision could not run (model or weather down) the correction still stands and the plan is simply the previous one."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 care plan', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  console.log('trigger: ' + pm.response.json().trigger);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8c Home feed",
+      "description": "The home screen in one request: local climate, next-plant suggestions, what changed lately, and what is blooming nearby (home-feed-design). Works on any account — a fresh one still answers 200 — but `climate` and `blooming_nearby` stay null/[] until it has a home cell, which a located photo upload sets (folder 6). `changes` fills in once a check-in (folder 8) has landed.",
+      "item": [
+        {
+          "name": "8c.1 GET /v1/home",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/home",
+            "description": "Auth. 200 with the four cards: `climate` (one line of copy plus the 30-day numbers, or null without a home cell), `suggestions` (catalogue species scored against what you already keep), `changes` (what your plants did in check-ins over the last 90 days — including `flowering`, from checkin.v2 — empty until folder 8 has run), and `blooming_nearby` (species iNaturalist saw in flower near your home cell this month, or [] without one). `meta.attribution` always carries both licence lines, Open-Meteo and iNaturalist, even when their cards are empty.\n\nThe whole document is cached per user for an hour: opening the app again costs nothing until then. A finished check-in (8.2/8.3) invalidates the cache on its way out, so a GET here right after one sees the new change immediately rather than waiting out the hour."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 with four cards and both attributions', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.meta.attribution).to.eql([",
+                  "    'Weather data by Open-Meteo.com (CC BY 4.0)',",
+                  "    'Observations by iNaturalist community (CC BY-NC)'",
+                  "  ]);",
+                  "  pm.expect(b.suggestions).to.be.an('array');",
+                  "  pm.expect(b.changes).to.be.an('array');",
+                  "  pm.expect(b.blooming_nearby).to.be.an('array');",
+                  "  console.log('climate: ' + (b.climate ? b.climate.kind : 'null') +",
+                  "              ', suggestions: ' + b.suggestions.length +",
+                  "              ', changes: ' + b.changes.length +",
+                  "              ', blooming_nearby: ' + b.blooming_nearby.length);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8d Signals (notes, skips)",
+      "item": [
+        {
+          "name": "8d.1 Quick note (chips, no photo)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/v1/plants/{{plant_id}}/notes",
+            "description": "Chips: drooping | dry_soil | wet_soil | leaf_drop | pests_seen | yellowing | new_growth (≥1, unique), optional text ≤200. Pulls the next check-in forward and writes owner-report findings the next check-in photo confirms or dismisses. 409 plant_not_active on a paused plant.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chips\": [\n    \"pests_seen\",\n    \"dry_soil\"\n  ],\n  \"text\": \"white specks on the stems, soil bone dry\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200, note event on top', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().care_history[0].type).to.eql('note');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "8d.2 Skip a watering (soil still wet)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/v1/plants/{{plant_id}}/water/skip",
+            "description": "reason: soil_wet | away | forgot. soil_wet pushes next_watering out two days and counts as care given; away/forgot change nothing but the record. Score unchanged.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"soil_wet\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200, watering_skipped event on top', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().care_history[0].type).to.eql('watering_skipped');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "8d.3 Today's tasks (saves tstep_task_id if a treatment step is due)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/care/today",
+            "description": "Kinds: watering | condition | treatment_step | environment. Treatment steps carry course_id, problem_id and problem ('all' = serves every problem on the course). Ids: task-water-<plantId>, task-cond-<plantId>, task-tstep-<stepId>, task-env-<plantId>-<yyyymmdd>."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 array; remember a treatment step if any', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const b = pm.response.json(); pm.expect(b).to.be.an('array');",
+                  "  const step = b.find(t => t.kind === 'treatment_step');",
+                  "  if (step) { pm.collectionVariables.set('tstep_task_id', step.id); console.log('tstep_task_id =', step.id, step.problem, step.title); }",
+                  "  else { console.warn('No treatment step due today: open a course first (identify a sick plant, or check in with a finding).'); }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "8d.4 Skip a treatment step",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/v1/care/tasks/{{tstep_task_id}}/skip",
+            "description": "Only a treatment_step task can be skipped (optional reason ≤200). A watering or check-in task → 400 task_not_skippable; unknown id → 404 task_not_found. Run 8d.3 first so tstep_task_id is set.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"no neem oil at home this week\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 skipped, or 404 when no step was saved', function () {",
+                  "  pm.expect([200,404]).to.include(pm.response.code);",
+                  "  if (pm.response.code === 200) pm.expect(pm.response.json().done).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8e Treatments & courses",
+      "item": [
+        {
+          "name": "8e.1 Treatments of the plant (saves treatment_id)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/plants/{{plant_id}}/treatments",
+            "description": "One object per problem, newest first, closed ones included. Rows that were opened from one scan share a course_id. Empty array until a finding with a severity opened one (identify a sick plant, or check in with [[fixture:worse]] on the fixture backend)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 array; remember the newest open treatment', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const b = pm.response.json(); pm.expect(b).to.be.an('array');",
+                  "  const open = b.find(t => ['active','improving','escalated'].includes(t.status)) || b[0];",
+                  "  if (open) { pm.collectionVariables.set('treatment_id', open.id); pm.collectionVariables.set('course_id', open.course_id); console.log('treatment_id =', open.id, 'course_id =', open.course_id); }",
+                  "  else { console.warn('No treatments yet on this plant.'); }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "8e.2 The plant's course (saves course_id)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/plants/{{plant_id}}/courses",
+            "description": "A plant has ONE plan: a course lists its problems worst-first (each with its own status, tier and review date) and one ordered step list, each step labelled with the problem it serves or 'all'. At most 6 steps due on any day and 15 outstanding at once. A problem found at a later check-in joins the open course (care event treatment_problem_added)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 array of courses', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const b = pm.response.json(); pm.expect(b).to.be.an('array');",
+                  "  if (b.length) { pm.collectionVariables.set('course_id', b[0].id); console.log('course', b[0].id, b[0].status, 'problems:', b[0].problems.map(p => p.problem_id).join(', '), 'steps:', b[0].steps.length); }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "8e.3 Abandon one treatment",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/v1/treatments/{{treatment_id}}/abandon",
+            "description": "reason: too_hard | plant_recovered | other, optional note ≤200. too_hard buys the problem a 14-day cooldown before it is prescribed again; plant_recovered resolves the finding and counts as a recurrence if it comes back within 90 days. Its pending steps are skipped and the check-in cadence restored. 409 treatment_not_open if already closed; 404 for an id that is not yours.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"too_hard\",\n  \"note\": \"cannot isolate it in a studio flat\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200, or 404/409 when nothing is open', function () {",
+                  "  pm.expect([200,404,409]).to.include(pm.response.code);",
+                  "  if (pm.response.code === 200) pm.expect(pm.response.json().status).to.eql('abandoned');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "8e.4 Abandon the whole course",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/v1/courses/{{course_id}}/abandon",
+            "description": "The same three reasons applied to every open problem on the course at once. 409 course_not_open when nothing is open (e.g. right after 8e.3 closed the only member); 404 course_not_found for an id that is not yours.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"plant_recovered\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200, or 404/409 when the course is already closed', function () {",
+                  "  pm.expect([200,404,409]).to.include(pm.response.code);",
+                  "  if (pm.response.code === 200) pm.expect(pm.response.json().status).to.eql('closed');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8f Admin (not for the app)",
+      "item": [
+        {
+          "name": "8f.1 Problem metrics (403 for a member)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/admin/metrics/problems",
+            "description": "Nightly (04:00 UTC) accuracy rates per problem over the trailing 90 days: count, verdict_disagreement_rate, note_confirm_rate, resolved_within_horizon_rate, mean_days_to_resolve, abandon_rate. Needs role admin: docker compose exec -T postgres sh -c 'psql -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\" -c \"update users set role=''admin'' where email=''{{email}}''\"'. Rows appear only after the job has run once (docker compose exec -T worker celery -A app.core.celery_app:celery call care.problem_metrics)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 admin_only for a member, 200 for an admin', function () {",
+                  "  pm.expect([200,403]).to.include(pm.response.code);",
+                  "  if (pm.response.code === 403) pm.expect(pm.response.json().error.code).to.eql('admin_only');",
+                  "  else pm.expect(pm.response.json().problems).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "9 Cleanup (run last — destructive)",
+      "description": "Soft-deletes. Run these only when you are finished: afterwards the plant and then the whole account return 404/401 everywhere. To start over, run 1.1 Sign up with a new email.",
+      "item": [
+        {
+          "name": "9.1 Delete plant (soft)",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/v1/plants/{{plant_id}}?keep_photos=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "plants",
+                "{{plant_id}}"
+              ],
+              "query": [
+                {
+                  "key": "keep_photos",
+                  "value": "true"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "9.2 DELETE /me (soft delete)",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/v1/me"
+          },
+          "description": "Soft-deletes the account and revokes refresh tokens. Afterwards every authenticated call returns 401 and signing up with the same email returns 409 account_deleted. Run this only at the very end.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

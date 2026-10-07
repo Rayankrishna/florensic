@@ -52,16 +52,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   physics: const BouncingScrollPhysics(),
                   slivers: [
                     SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(AppSpacing.gutter,
-                          AppSpacing.lg, AppSpacing.gutter, 0),
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.gutter,
+                        AppSpacing.lg,
+                        AppSpacing.gutter,
+                        0,
+                      ),
                       sliver: SliverToBoxAdapter(
                         child: NavHeader(
                           title: 'Notifications',
                           onBack: () => Navigator.of(context).maybePop(),
-                          trailing: _MarkReadButton(
-                            enabled: _store.hasUnread,
-                            onTap: _store.markAllRead,
-                          ),
+                          // Hidden rather than dimmed: a wide disabled pill
+                          // collides with the centred title.
+                          trailing: _store.hasUnread
+                              ? _MarkReadButton(onTap: _store.markAllRead)
+                              : null,
                         ),
                       ),
                     ),
@@ -71,8 +76,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         child: ListView.separated(
                           scrollDirection: Axis.horizontal,
                           physics: const BouncingScrollPhysics(),
-                          padding: const EdgeInsets.fromLTRB(AppSpacing.gutter,
-                              AppSpacing.xl, AppSpacing.gutter, AppSpacing.xl),
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.gutter,
+                            AppSpacing.xl,
+                            AppSpacing.gutter,
+                            AppSpacing.xl,
+                          ),
                           itemCount: NotificationFilter.values.length,
                           separatorBuilder: (_, __) =>
                               const SizedBox(width: AppSpacing.md),
@@ -91,8 +100,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     ),
                     if (_store.isLoading && _store.items.isEmpty)
                       const SliverPadding(
-                        padding:
-                            EdgeInsets.symmetric(horizontal: AppSpacing.gutter),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: AppSpacing.gutter,
+                        ),
                         sliver: SliverToBoxAdapter(
                           child: Column(
                             children: [
@@ -107,14 +117,19 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       )
                     else if (_store.isEmpty)
                       SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(AppSpacing.gutter,
-                            AppSpacing.xxxl, AppSpacing.gutter, 0),
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.gutter,
+                          AppSpacing.xxxl,
+                          AppSpacing.gutter,
+                          0,
+                        ),
                         sliver: SliverToBoxAdapter(
                           child: EmptyState(
                             compact: true,
                             icon: PgIcons.bell,
                             title: 'Nothing here yet',
-                            body: 'Nothing in this category. Reminders arrive '
+                            body:
+                                'Nothing in this category. Reminders arrive '
                                 'before trouble does.',
                             primaryLabel: 'Show all',
                             onPrimary: () =>
@@ -125,15 +140,20 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     else
                       for (final group in _store.grouped) ...[
                         SliverPadding(
-                          padding: const EdgeInsets.fromLTRB(AppSpacing.gutter,
-                              AppSpacing.sm, AppSpacing.gutter, AppSpacing.md),
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.gutter,
+                            AppSpacing.sm,
+                            AppSpacing.gutter,
+                            AppSpacing.md,
+                          ),
                           sliver: SliverToBoxAdapter(
                             child: CaptionLabel(group.key),
                           ),
                         ),
                         SliverPadding(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.gutter),
+                            horizontal: AppSpacing.gutter,
+                          ),
                           sliver: SliverList.separated(
                             itemCount: group.value.length,
                             separatorBuilder: (_, __) =>
@@ -148,19 +168,23 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           ),
                         ),
                         const SliverToBoxAdapter(
-                            child: SizedBox(height: AppSpacing.xl)),
+                          child: SizedBox(height: AppSpacing.xl),
+                        ),
                       ],
                     SliverToBoxAdapter(
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(AppSpacing.gutter,
-                            AppSpacing.xxl, AppSpacing.gutter, AppSpacing.xxxl),
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.gutter,
+                          AppSpacing.xxl,
+                          AppSpacing.gutter,
+                          AppSpacing.xxxl,
+                        ),
                         child: Center(
                           child: AppButton(
                             label: 'Reminder settings',
                             style: AppButtonStyle.link,
                             expand: false,
-                            onPressed: () =>
-                                Navigator.of(context).maybePop(),
+                            onPressed: () => Navigator.of(context).maybePop(),
                           ),
                         ),
                       ),
@@ -180,36 +204,32 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (id == null) return;
     final plant = locator<PlantCollectionStore>().plantById(id);
     if (plant == null) return;
-    Navigator.of(context)
-        .pushNamed(AppRoutes.plantDetail, arguments: plant);
+    Navigator.of(context).pushNamed(AppRoutes.plantDetail, arguments: plant);
   }
 }
 
 class _MarkReadButton extends StatelessWidget {
-  const _MarkReadButton({required this.enabled, required this.onTap});
+  const _MarkReadButton({required this.onTap});
 
-  final bool enabled;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: enabled ? onTap : null,
-      child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 220),
-        opacity: enabled ? 1 : 0.45,
-        child: Container(
-          height: 52,
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-          alignment: Alignment.center,
-          decoration: const BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: AppRadius.pillR,
-            boxShadow: AppShadows.raised,
-          ),
-          child: Text('Mark read',
-              style: AppText.heading17.copyWith(fontSize: 15)),
+      onTap: onTap,
+      child: Container(
+        height: 52,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+        alignment: Alignment.center,
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: AppRadius.pillR,
+          boxShadow: AppShadows.raised,
+        ),
+        child: Text(
+          'Mark read',
+          style: AppText.heading17.copyWith(fontSize: 15),
         ),
       ),
     );
@@ -231,8 +251,7 @@ class _NotificationRow extends StatelessWidget {
     final (icon, tone) = switch (item.kind) {
       NotificationKind.conditionUpdate => (PgIcons.camera, MetricStatus.watch),
       NotificationKind.watering => (PgIcons.droplet, MetricStatus.neutral),
-      NotificationKind.environment =>
-        (PgIcons.thermometer, MetricStatus.watch),
+      NotificationKind.environment => (PgIcons.thermometer, MetricStatus.watch),
       NotificationKind.healthChange => (PgIcons.chart, MetricStatus.good),
       NotificationKind.checkInMissed => (PgIcons.alertCircle, MetricStatus.bad),
       NotificationKind.appUpdate => (PgIcons.leaf, MetricStatus.neutral),

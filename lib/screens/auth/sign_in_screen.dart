@@ -20,8 +20,8 @@ class SignInScreen extends StatefulWidget {
 }
 
 class _SignInScreenState extends State<SignInScreen> {
-  final _email = TextEditingController(text: 'alex.moreau@studio.co');
-  final _password = TextEditingController(text: 'plantgram');
+  final _email = TextEditingController();
+  final _password = TextEditingController();
   final AuthStore _store = locator<AuthStore>();
 
   @override
@@ -37,12 +37,36 @@ class _SignInScreenState extends State<SignInScreen> {
     super.dispose();
   }
 
+  /// A reset needs a code, so ask for one before showing the code screen —
+  /// otherwise the keeper lands on six empty boxes with nothing on the way.
+  Future<void> _resetPassword() async {
+    final email = _email.text.trim();
+    if (email.isEmpty) {
+      _store.setError('Enter your email address first.');
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    final sent = await _store.requestCode(email, purpose: 'reset');
+    if (sent && mounted) {
+      Navigator.of(context).pushNamed(AppRoutes.verifyCode);
+    }
+  }
+
   Future<void> _submit() async {
     FocusScope.of(context).unfocus();
     final ok = await _store.signIn(_email.text.trim(), _password.text);
-    if (ok && mounted) {
-      Navigator.of(context).pushNamedAndRemoveUntil(
-          AppRoutes.onboarding, (route) => false);
+    if (!mounted) return;
+
+    if (ok) {
+      Navigator.of(
+        context,
+      ).pushNamedAndRemoveUntil(AppRoutes.onboarding, (route) => false);
+      return;
+    }
+    // 403 email_unverified: the store has already sent a fresh code, so carry
+    // on to the code screen rather than leaving an error on a dead end.
+    if (_store.needsVerification) {
+      Navigator.of(context).pushNamed(AppRoutes.verifyCode);
     }
   }
 
@@ -58,8 +82,12 @@ class _SignInScreenState extends State<SignInScreen> {
               builder: (context) => CustomScrollView(
                 slivers: [
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(AppSpacing.gutter,
-                        AppSpacing.lg, AppSpacing.gutter, AppSpacing.gutter),
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.gutter,
+                      AppSpacing.lg,
+                      AppSpacing.gutter,
+                      AppSpacing.gutter,
+                    ),
                     sliver: SliverList.list(
                       children: [
                         Align(
@@ -70,8 +98,10 @@ class _SignInScreenState extends State<SignInScreen> {
                           ),
                         ),
                         const SizedBox(height: AppSpacing.xxxl),
-                        Text('Welcome back.',
-                            style: AppText.display40.copyWith(fontSize: 37)),
+                        Text(
+                          'Welcome back.',
+                          style: AppText.display40.copyWith(fontSize: 37),
+                        ),
                         const SizedBox(height: AppSpacing.md),
                         Text(
                           'Sign in to pick up where your collection left off.',
@@ -120,65 +150,20 @@ class _SignInScreenState extends State<SignInScreen> {
                           ),
                         ),
                         const SizedBox(height: AppSpacing.lg),
-                        Row(
-                          children: [
-                            AppCheckbox(
-                              value: _store.keepSignedIn,
-                              onChanged: _store.setKeepSignedIn,
-                            ),
-                            const SizedBox(width: AppSpacing.sm),
-                            Text('Keep me signed in',
-                                style: AppText.body15.copyWith(fontSize: 15)),
-                            const Spacer(),
-                            AppButton(
-                              label: 'Forgot password?',
-                              style: AppButtonStyle.link,
-                              expand: false,
-                              onPressed: () => Navigator.of(context)
-                                  .pushNamed(AppRoutes.verifyCode),
-                            ),
-                          ],
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: AppButton(
+                            label: 'Forgot password?',
+                            style: AppButtonStyle.link,
+                            expand: false,
+                            onPressed: _resetPassword,
+                          ),
                         ),
                         const SizedBox(height: AppSpacing.xxl),
                         AppButton.primary(
                           label: 'Sign in',
                           loading: _store.isLoading,
                           onPressed: _submit,
-                        ),
-                        const SizedBox(height: AppSpacing.xl),
-                        Row(
-                          children: [
-                            const Expanded(
-                                child: Divider(color: AppColors.line)),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: AppSpacing.lg),
-                              child: Text('or',
-                                  style: AppText.body15.copyWith(fontSize: 14)),
-                            ),
-                            const Expanded(
-                                child: Divider(color: AppColors.line)),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.xl),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: AppButton.outline(
-                                label: 'Apple',
-                                icon: PgIcons.apple,
-                                onPressed: () => _provider('apple'),
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.md),
-                            Expanded(
-                              child: AppButton.outline(
-                                label: 'Google',
-                                icon: PgIcons.google,
-                                onPressed: () => _provider('google'),
-                              ),
-                            ),
-                          ],
                         ),
                       ],
                     ),
@@ -189,21 +174,22 @@ class _SignInScreenState extends State<SignInScreen> {
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         Padding(
-                          padding:
-                              const EdgeInsets.only(bottom: AppSpacing.xl),
+                          padding: const EdgeInsets.only(bottom: AppSpacing.xl),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Text('No account yet?',
-                                  style:
-                                      AppText.body15.copyWith(fontSize: 14)),
+                              Text(
+                                'No account yet?',
+                                style: AppText.body15.copyWith(fontSize: 14),
+                              ),
                               const SizedBox(width: AppSpacing.sm),
                               AppButton(
                                 label: 'Sign up',
                                 style: AppButtonStyle.link,
                                 expand: false,
-                                onPressed: () => Navigator.of(context)
-                                    .pushReplacementNamed(AppRoutes.signUp),
+                                onPressed: () => Navigator.of(
+                                  context,
+                                ).pushReplacementNamed(AppRoutes.signUp),
                               ),
                             ],
                           ),
@@ -218,13 +204,5 @@ class _SignInScreenState extends State<SignInScreen> {
         ),
       ),
     );
-  }
-
-  Future<void> _provider(String name) async {
-    final ok = await _store.continueWithProvider(name);
-    if (ok && mounted) {
-      Navigator.of(context)
-          .pushNamedAndRemoveUntil(AppRoutes.onboarding, (route) => false);
-    }
   }
 }

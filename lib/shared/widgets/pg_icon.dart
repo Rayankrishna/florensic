@@ -59,8 +59,6 @@ enum PgIcons {
   eyeOff,
   help,
   info,
-  google,
-  apple,
 }
 
 /// Draws a [PgIcons] glyph.
@@ -666,69 +664,7 @@ class _PgIconPainter extends CustomPainter {
         });
         line(3.4, 3.4, 20.6, 20.6);
 
-      case PgIcons.google:
-        _paintGoogle(canvas, s);
-
-      case PgIcons.apple:
-        _paintApple(canvas, s, color);
     }
-  }
-
-  /// The Google mark keeps its own colours; it is a brand asset, not part of
-  /// the mono icon family.
-  void _paintGoogle(Canvas canvas, double s) {
-    final rect = Rect.fromCircle(center: Offset(12 * s, 12 * s), radius: 8.4 * s);
-    final stroke = 4.4 * s;
-    void arc(double start, double sweep, Color c) {
-      canvas.drawArc(
-        rect,
-        start,
-        sweep,
-        false,
-        Paint()
-          ..color = c
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = stroke
-          ..isAntiAlias = true,
-      );
-    }
-
-    arc(-math.pi * 0.28, math.pi * 0.52, const Color(0xFFEA4335));
-    arc(math.pi * 0.24, math.pi * 0.54, const Color(0xFFFBBC05));
-    arc(math.pi * 0.78, math.pi * 0.52, const Color(0xFF34A853));
-    arc(-math.pi * 0.74, math.pi * 0.46, const Color(0xFF4285F4));
-    canvas.drawRect(
-      Rect.fromLTWH(12 * s, 9.9 * s, 8.8 * s, 4.2 * s),
-      Paint()..color = const Color(0xFF4285F4),
-    );
-    canvas.drawRect(
-      Rect.fromLTWH(11.6 * s, 9.9 * s, 2.2 * s, 4.2 * s),
-      Paint()..color = const Color(0x00000000),
-    );
-  }
-
-  void _paintApple(Canvas canvas, double s, Color c) {
-    final fill = Paint()
-      ..color = c
-      ..isAntiAlias = true;
-    final body = Path()
-      ..moveTo(12 * s, 7.4 * s)
-      ..cubicTo(13.6 * s, 6.2 * s, 16 * s, 6.3 * s, 17.4 * s, 7.8 * s)
-      ..cubicTo(15.6 * s, 9 * s, 15.8 * s, 11.8 * s, 17.8 * s, 12.8 * s)
-      ..cubicTo(17.2 * s, 14.9 * s, 15.6 * s, 17.8 * s, 14 * s, 18.4 * s)
-      ..cubicTo(13 * s, 18.8 * s, 12.6 * s, 18.2 * s, 11.6 * s, 18.2 * s)
-      ..cubicTo(10.6 * s, 18.2 * s, 10.1 * s, 18.8 * s, 9.2 * s, 18.4 * s)
-      ..cubicTo(7.2 * s, 17.6 * s, 5.4 * s, 13.4 * s, 6.2 * s, 10.6 * s)
-      ..cubicTo(6.8 * s, 8.5 * s, 8.6 * s, 7.2 * s, 10.2 * s, 7.2 * s)
-      ..cubicTo(11 * s, 7.2 * s, 11.5 * s, 7.4 * s, 12 * s, 7.4 * s)
-      ..close();
-    canvas.drawPath(body, fill);
-    final leaf = Path()
-      ..moveTo(12.6 * s, 6.2 * s)
-      ..cubicTo(12.4 * s, 4.6 * s, 13.8 * s, 3.2 * s, 15.2 * s, 3.2 * s)
-      ..cubicTo(15.4 * s, 4.8 * s, 14 * s, 6.2 * s, 12.6 * s, 6.2 * s)
-      ..close();
-    canvas.drawPath(leaf, fill);
   }
 
   @override

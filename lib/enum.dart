@@ -3,10 +3,18 @@ library;
 
 /// Health bands drive the ring colour: lime above 70, amber 40–69,
 /// coral below 40 (Foundations · Health score).
-enum HealthBand { thriving, watch, critical, paused }
+///
+/// A plant with no band — never scored, or paused — carries `null`; there is
+/// no "paused" band.
+enum HealthBand { thriving, watch, critical }
 
-/// Whether a plant is under active care, or paused after a missed check-in.
-enum CareStatus { active, paused }
+/// Where a plant sits in its care cycle, in order: one missed check-in
+/// window makes it `stale`, a second pauses it.
+enum CareStatus { active, stale, paused }
+
+/// A row on today's care list. [unknown] is a kind this build does not know
+/// yet — it still renders its own title and detail and can be completed.
+enum CareTaskKind { watering, condition, treatmentStep, environment, unknown }
 
 /// Status dot on a metric card.
 enum MetricStatus { good, watch, bad, neutral }
@@ -45,8 +53,21 @@ enum ScanStatus { idle, scanning, matched, noMatch, offline }
 /// Trend chart range selector.
 enum TrendRange { week, month, quarter }
 
-/// Care-history event type.
-enum CareEventType { watered, conditionUpdate, repotted, moved }
+/// Care-history event type. [other] covers a type this build does not know.
+enum CareEventType {
+  added,
+  watered,
+  wateringSkipped,
+  conditionUpdate,
+  checkInMissed,
+  note,
+  speciesCorrected,
+  resumed,
+  treatment,
+  repotted,
+  moved,
+  other,
+}
 
 /// Runtime permissions requested during setup.
 enum PermissionKind { location, reminders, camera, photoLibrary }
@@ -55,8 +76,9 @@ enum PermissionKind { location, reminders, camera, photoLibrary }
 enum LoadState { idle, loading, ready, empty, error }
 
 extension HealthBandX on HealthBand {
-  static HealthBand fromScore(int? score) {
-    if (score == null) return HealthBand.paused;
+  /// `thriving >= 70 · watch >= 40 · critical`; no score, no band.
+  static HealthBand? fromScore(int? score) {
+    if (score == null) return null;
     if (score >= 70) return HealthBand.thriving;
     if (score >= 40) return HealthBand.watch;
     return HealthBand.critical;
@@ -123,13 +145,6 @@ extension ConditionVerdictX on ConditionVerdict {
         ConditionVerdict.healthy => 'Nothing unusual since last time',
         ConditionVerdict.concerns => 'A few things look off',
         ConditionVerdict.needsAttention => 'Something is clearly wrong',
-      };
-
-  /// How the verdict moves the health score in the mock scoring service.
-  int get scoreDelta => switch (this) {
-        ConditionVerdict.healthy => 3,
-        ConditionVerdict.concerns => -2,
-        ConditionVerdict.needsAttention => -8,
       };
 }
 

@@ -9,6 +9,13 @@ part of 'auth_store.dart';
 // ignore_for_file: non_constant_identifier_names, unnecessary_brace_in_string_interps, unnecessary_lambdas, prefer_expression_function_bodies, lines_longer_than_80_chars, avoid_as, avoid_annotating_with_dynamic, no_leading_underscores_for_local_identifiers
 
 mixin _$AuthStore on _AuthStore, Store {
+  Computed<bool>? _$isLoadingComputed;
+
+  @override
+  bool get isLoading => (_$isLoadingComputed ??= Computed<bool>(
+    () => super.isLoading,
+    name: '_AuthStore.isLoading',
+  )).value;
   Computed<bool>? _$isAuthenticatedComputed;
 
   @override
@@ -16,6 +23,14 @@ mixin _$AuthStore on _AuthStore, Store {
     () => super.isAuthenticated,
     name: '_AuthStore.isAuthenticated',
   )).value;
+  Computed<bool>? _$isResettingPasswordComputed;
+
+  @override
+  bool get isResettingPassword =>
+      (_$isResettingPasswordComputed ??= Computed<bool>(
+        () => super.isResettingPassword,
+        name: '_AuthStore.isResettingPassword',
+      )).value;
   Computed<String>? _$codeValueComputed;
 
   @override
@@ -46,21 +61,111 @@ mixin _$AuthStore on _AuthStore, Store {
         name: '_AuthStore.passwordStrengthLabel',
       )).value;
 
-  late final _$isLoadingAtom = Atom(
-    name: '_AuthStore.isLoading',
+  late final _$signInStateAtom = Atom(
+    name: '_AuthStore.signInState',
     context: context,
   );
 
   @override
-  bool get isLoading {
-    _$isLoadingAtom.reportRead();
-    return super.isLoading;
+  LoadState get signInState {
+    _$signInStateAtom.reportRead();
+    return super.signInState;
   }
 
   @override
-  set isLoading(bool value) {
-    _$isLoadingAtom.reportWrite(value, super.isLoading, () {
-      super.isLoading = value;
+  set signInState(LoadState value) {
+    _$signInStateAtom.reportWrite(value, super.signInState, () {
+      super.signInState = value;
+    });
+  }
+
+  late final _$signUpStateAtom = Atom(
+    name: '_AuthStore.signUpState',
+    context: context,
+  );
+
+  @override
+  LoadState get signUpState {
+    _$signUpStateAtom.reportRead();
+    return super.signUpState;
+  }
+
+  @override
+  set signUpState(LoadState value) {
+    _$signUpStateAtom.reportWrite(value, super.signUpState, () {
+      super.signUpState = value;
+    });
+  }
+
+  late final _$otpRequestStateAtom = Atom(
+    name: '_AuthStore.otpRequestState',
+    context: context,
+  );
+
+  @override
+  LoadState get otpRequestState {
+    _$otpRequestStateAtom.reportRead();
+    return super.otpRequestState;
+  }
+
+  @override
+  set otpRequestState(LoadState value) {
+    _$otpRequestStateAtom.reportWrite(value, super.otpRequestState, () {
+      super.otpRequestState = value;
+    });
+  }
+
+  late final _$verifyStateAtom = Atom(
+    name: '_AuthStore.verifyState',
+    context: context,
+  );
+
+  @override
+  LoadState get verifyState {
+    _$verifyStateAtom.reportRead();
+    return super.verifyState;
+  }
+
+  @override
+  set verifyState(LoadState value) {
+    _$verifyStateAtom.reportWrite(value, super.verifyState, () {
+      super.verifyState = value;
+    });
+  }
+
+  late final _$resetStateAtom = Atom(
+    name: '_AuthStore.resetState',
+    context: context,
+  );
+
+  @override
+  LoadState get resetState {
+    _$resetStateAtom.reportRead();
+    return super.resetState;
+  }
+
+  @override
+  set resetState(LoadState value) {
+    _$resetStateAtom.reportWrite(value, super.resetState, () {
+      super.resetState = value;
+    });
+  }
+
+  late final _$sessionStateAtom = Atom(
+    name: '_AuthStore.sessionState',
+    context: context,
+  );
+
+  @override
+  LoadState get sessionState {
+    _$sessionStateAtom.reportRead();
+    return super.sessionState;
+  }
+
+  @override
+  set sessionState(LoadState value) {
+    _$sessionStateAtom.reportWrite(value, super.sessionState, () {
+      super.sessionState = value;
     });
   }
 
@@ -94,24 +199,6 @@ mixin _$AuthStore on _AuthStore, Store {
   set profile(UserProfile? value) {
     _$profileAtom.reportWrite(value, super.profile, () {
       super.profile = value;
-    });
-  }
-
-  late final _$keepSignedInAtom = Atom(
-    name: '_AuthStore.keepSignedIn',
-    context: context,
-  );
-
-  @override
-  bool get keepSignedIn {
-    _$keepSignedInAtom.reportRead();
-    return super.keepSignedIn;
-  }
-
-  @override
-  set keepSignedIn(bool value) {
-    _$keepSignedInAtom.reportWrite(value, super.keepSignedIn, () {
-      super.keepSignedIn = value;
     });
   }
 
@@ -184,6 +271,42 @@ mixin _$AuthStore on _AuthStore, Store {
     });
   }
 
+  late final _$otpPurposeAtom = Atom(
+    name: '_AuthStore.otpPurpose',
+    context: context,
+  );
+
+  @override
+  String get otpPurpose {
+    _$otpPurposeAtom.reportRead();
+    return super.otpPurpose;
+  }
+
+  @override
+  set otpPurpose(String value) {
+    _$otpPurposeAtom.reportWrite(value, super.otpPurpose, () {
+      super.otpPurpose = value;
+    });
+  }
+
+  late final _$needsVerificationAtom = Atom(
+    name: '_AuthStore.needsVerification',
+    context: context,
+  );
+
+  @override
+  bool get needsVerification {
+    _$needsVerificationAtom.reportRead();
+    return super.needsVerification;
+  }
+
+  @override
+  set needsVerification(bool value) {
+    _$needsVerificationAtom.reportWrite(value, super.needsVerification, () {
+      super.needsVerification = value;
+    });
+  }
+
   late final _$acceptedTermsAtom = Atom(
     name: '_AuthStore.acceptedTerms',
     context: context,
@@ -220,14 +343,58 @@ mixin _$AuthStore on _AuthStore, Store {
     });
   }
 
+  late final _$signInAsyncAction = AsyncAction(
+    '_AuthStore.signIn',
+    context: context,
+  );
+
+  @override
+  Future<bool> signIn(String email, String password) {
+    return _$signInAsyncAction.run(() => super.signIn(email, password));
+  }
+
+  late final _$signUpAsyncAction = AsyncAction(
+    '_AuthStore.signUp',
+    context: context,
+  );
+
+  @override
+  Future<bool> signUp(String name, String email, String password) {
+    return _$signUpAsyncAction.run(() => super.signUp(name, email, password));
+  }
+
   late final _$requestCodeAsyncAction = AsyncAction(
     '_AuthStore.requestCode',
     context: context,
   );
 
   @override
-  Future<bool> requestCode(String email) {
-    return _$requestCodeAsyncAction.run(() => super.requestCode(email));
+  Future<bool> requestCode(String email, {String purpose = 'signin'}) {
+    return _$requestCodeAsyncAction.run(
+      () => super.requestCode(email, purpose: purpose),
+    );
+  }
+
+  late final _$verifyCodeAsyncAction = AsyncAction(
+    '_AuthStore.verifyCode',
+    context: context,
+  );
+
+  @override
+  Future<bool> verifyCode() {
+    return _$verifyCodeAsyncAction.run(() => super.verifyCode());
+  }
+
+  late final _$resetPasswordAsyncAction = AsyncAction(
+    '_AuthStore.resetPassword',
+    context: context,
+  );
+
+  @override
+  Future<bool> resetPassword(String newPassword) {
+    return _$resetPasswordAsyncAction.run(
+      () => super.resetPassword(newPassword),
+    );
   }
 
   late final _$signOutAsyncAction = AsyncAction(
@@ -250,22 +417,20 @@ mixin _$AuthStore on _AuthStore, Store {
     return _$restoreSessionAsyncAction.run(() => super.restoreSession());
   }
 
-  late final _$_AuthStoreActionController = ActionController(
-    name: '_AuthStore',
+  late final _$syncTimezoneAsyncAction = AsyncAction(
+    '_AuthStore.syncTimezone',
     context: context,
   );
 
   @override
-  void setKeepSignedIn(bool value) {
-    final _$actionInfo = _$_AuthStoreActionController.startAction(
-      name: '_AuthStore.setKeepSignedIn',
-    );
-    try {
-      return super.setKeepSignedIn(value);
-    } finally {
-      _$_AuthStoreActionController.endAction(_$actionInfo);
-    }
+  Future<void> syncTimezone() {
+    return _$syncTimezoneAsyncAction.run(() => super.syncTimezone());
   }
+
+  late final _$_AuthStoreActionController = ActionController(
+    name: '_AuthStore',
+    context: context,
+  );
 
   @override
   void toggleObscurePassword() {
@@ -328,48 +493,12 @@ mixin _$AuthStore on _AuthStore, Store {
   }
 
   @override
-  Future<bool> signIn(String email, String password) {
+  void setError(String message) {
     final _$actionInfo = _$_AuthStoreActionController.startAction(
-      name: '_AuthStore.signIn',
+      name: '_AuthStore.setError',
     );
     try {
-      return super.signIn(email, password);
-    } finally {
-      _$_AuthStoreActionController.endAction(_$actionInfo);
-    }
-  }
-
-  @override
-  Future<bool> signUp(String name, String email, String password) {
-    final _$actionInfo = _$_AuthStoreActionController.startAction(
-      name: '_AuthStore.signUp',
-    );
-    try {
-      return super.signUp(name, email, password);
-    } finally {
-      _$_AuthStoreActionController.endAction(_$actionInfo);
-    }
-  }
-
-  @override
-  Future<bool> continueWithProvider(String provider) {
-    final _$actionInfo = _$_AuthStoreActionController.startAction(
-      name: '_AuthStore.continueWithProvider',
-    );
-    try {
-      return super.continueWithProvider(provider);
-    } finally {
-      _$_AuthStoreActionController.endAction(_$actionInfo);
-    }
-  }
-
-  @override
-  Future<bool> verifyCode() {
-    final _$actionInfo = _$_AuthStoreActionController.startAction(
-      name: '_AuthStore.verifyCode',
-    );
-    try {
-      return super.verifyCode();
+      return super.setError(message);
     } finally {
       _$_AuthStoreActionController.endAction(_$actionInfo);
     }
@@ -388,19 +517,39 @@ mixin _$AuthStore on _AuthStore, Store {
   }
 
   @override
+  void handleSessionExpired() {
+    final _$actionInfo = _$_AuthStoreActionController.startAction(
+      name: '_AuthStore.handleSessionExpired',
+    );
+    try {
+      return super.handleSessionExpired();
+    } finally {
+      _$_AuthStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
   String toString() {
     return '''
-isLoading: ${isLoading},
+signInState: ${signInState},
+signUpState: ${signUpState},
+otpRequestState: ${otpRequestState},
+verifyState: ${verifyState},
+resetState: ${resetState},
+sessionState: ${sessionState},
 errorMessage: ${errorMessage},
 profile: ${profile},
-keepSignedIn: ${keepSignedIn},
 obscurePassword: ${obscurePassword},
 code: ${code},
 resendSeconds: ${resendSeconds},
 pendingEmail: ${pendingEmail},
+otpPurpose: ${otpPurpose},
+needsVerification: ${needsVerification},
 acceptedTerms: ${acceptedTerms},
 passwordStrength: ${passwordStrength},
+isLoading: ${isLoading},
 isAuthenticated: ${isAuthenticated},
+isResettingPassword: ${isResettingPassword},
 codeValue: ${codeValue},
 canVerify: ${canVerify},
 canCreateAccount: ${canCreateAccount},

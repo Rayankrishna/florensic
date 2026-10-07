@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 
-import '../../domain/models/plant.dart';
 import '../../enum.dart';
 import '../../locator.dart';
 import '../../routes.dart';
 import '../../shared/components/app_button.dart';
 import '../../shared/components/app_surfaces.dart';
+import '../../shared/components/care_sheets.dart';
 import '../../shared/components/empty_state.dart';
 import '../../shared/components/headers.dart';
 import '../../shared/components/list_rows.dart';
@@ -63,7 +63,11 @@ class HomeScreen extends StatelessWidget {
                 slivers: [
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.gutter, AppSpacing.md, AppSpacing.gutter, 0),
+                      AppSpacing.gutter,
+                      AppSpacing.md,
+                      AppSpacing.gutter,
+                      0,
+                    ),
                     sliver: SliverList.list(
                       children: [
                         _GreetingRow(
@@ -85,18 +89,27 @@ class HomeScreen extends StatelessWidget {
                   ),
                   if (collection.isLoading && collection.plants.isEmpty)
                     const SliverPadding(
-                      padding: EdgeInsets.fromLTRB(AppSpacing.gutter,
-                          AppSpacing.section, AppSpacing.gutter, 0),
+                      padding: EdgeInsets.fromLTRB(
+                        AppSpacing.gutter,
+                        AppSpacing.section,
+                        AppSpacing.gutter,
+                        0,
+                      ),
                       sliver: SliverToBoxAdapter(child: _HomeSkeleton()),
                     )
                   else if (collection.isEmpty)
                     SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(AppSpacing.gutter,
-                          AppSpacing.xxxl, AppSpacing.gutter, 0),
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.gutter,
+                        AppSpacing.xxxl,
+                        AppSpacing.gutter,
+                        0,
+                      ),
                       sliver: SliverToBoxAdapter(
                         child: EmptyState(
                           title: 'Your collection is waiting to grow.',
-                          body: 'Scan a plant nearby and it arrives with a '
+                          body:
+                              'Scan a plant nearby and it arrives with a '
                               'profile, a care schedule and its own health '
                               'record.',
                           primaryLabel: 'Add your first plant',
@@ -104,16 +117,21 @@ class HomeScreen extends StatelessWidget {
                           onPrimary: () =>
                               Navigator.of(context).pushNamed(AppRoutes.scan),
                           secondaryLabel: 'Browse the Pokedex',
-                          onSecondary: () =>
-                              Navigator.of(context).pushNamed(AppRoutes.pokedex),
+                          onSecondary: () => Navigator.of(
+                            context,
+                          ).pushNamed(AppRoutes.pokedex),
                         ),
                       ),
                     )
                   else ...[
                     if (collection.needsAttention.isNotEmpty) ...[
                       SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(AppSpacing.gutter,
-                            AppSpacing.section, AppSpacing.gutter, AppSpacing.lg),
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.gutter,
+                          AppSpacing.section,
+                          AppSpacing.gutter,
+                          AppSpacing.lg,
+                        ),
                         sliver: SliverToBoxAdapter(
                           child: SectionHeader(
                             title: 'Needs attention',
@@ -125,54 +143,96 @@ class HomeScreen extends StatelessWidget {
                           ),
                         ),
                       ),
-                      SliverToBoxAdapter(
-                        child: _AttentionCarousel(
-                          plants: collection.needsAttention,
+                      SliverPadding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.gutter,
+                        ),
+                        sliver: SliverList.separated(
+                          itemCount: collection.needsAttention.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: AppSpacing.md),
+                          itemBuilder: (context, index) => Entrance(
+                            index: index,
+                            child: HomeAttentionCard(
+                              plant: collection.needsAttention[index],
+                              highlighted: index == 0,
+                            ),
+                          ),
                         ),
                       ),
                     ] else
                       const SliverPadding(
-                        padding: EdgeInsets.fromLTRB(AppSpacing.gutter,
-                            AppSpacing.section, AppSpacing.gutter, 0),
+                        padding: EdgeInsets.fromLTRB(
+                          AppSpacing.gutter,
+                          AppSpacing.section,
+                          AppSpacing.gutter,
+                          0,
+                        ),
                         sliver: SliverToBoxAdapter(child: _AllCaughtUpCard()),
                       ),
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(AppSpacing.gutter,
-                          AppSpacing.section, AppSpacing.gutter, AppSpacing.lg),
-                      sliver: SliverToBoxAdapter(
-                        child: SectionHeader(
-                          title: "Today's care",
-                          trailing:
-                              '${collection.doneTaskCount} of ${collection.tasks.length} done',
+                    // With nothing scheduled the header would read
+                    // "0 of 0 done" above an empty space.
+                    if (collection.tasks.isNotEmpty)
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.gutter,
+                          AppSpacing.section,
+                          AppSpacing.gutter,
+                          AppSpacing.lg,
+                        ),
+                        sliver: SliverToBoxAdapter(
+                          child: SectionHeader(
+                            title: "Today's care",
+                            trailing:
+                                '${collection.doneTaskCount} of ${collection.tasks.length} done',
+                          ),
                         ),
                       ),
-                    ),
                     SliverPadding(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.gutter),
+                        horizontal: AppSpacing.gutter,
+                      ),
                       sliver: SliverList.separated(
                         itemCount: collection.tasks.length,
                         separatorBuilder: (_, __) =>
                             const SizedBox(height: AppSpacing.md),
                         itemBuilder: (context, index) {
                           final task = collection.tasks[index];
+                          // Steps arrive grouped by plan; a heading marks
+                          // where each plan's steps start.
+                          final startsPlan =
+                              task.kind == CareTaskKind.treatmentStep &&
+                              task.courseId != null &&
+                              (index == 0 ||
+                                  collection.tasks[index - 1].courseId !=
+                                      task.courseId);
                           return Entrance(
                             index: index,
                             child: _CareTaskRow(
                               task: task,
+                              planHeading: startsPlan
+                                  ? 'Treatment plan · '
+                                        '${collection.plantById(task.plantId)?.nickname ?? 'your plant'}'
+                                  : null,
                               onToggle: () => collection.completeTask(task.id),
+                              onSkip: task.skippable
+                                  ? () => showSkipStepSheet(context, task)
+                                  : null,
                               onOpen: () {
-                                final plant =
-                                    collection.plantById(task.plantId);
+                                final plant = collection.plantById(
+                                  task.plantId,
+                                );
                                 if (plant == null) return;
-                                if (task.kind == MetricKind.condition) {
+                                if (task.kind == CareTaskKind.condition) {
                                   Navigator.of(context).pushNamed(
-                                      AppRoutes.conditionUpdate,
-                                      arguments: plant);
+                                    AppRoutes.conditionUpdate,
+                                    arguments: plant,
+                                  );
                                 } else {
                                   Navigator.of(context).pushNamed(
-                                      AppRoutes.plantDetail,
-                                      arguments: plant);
+                                    AppRoutes.plantDetail,
+                                    arguments: plant,
+                                  );
                                 }
                               },
                             ),
@@ -181,8 +241,12 @@ class HomeScreen extends StatelessWidget {
                       ),
                     ),
                     SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(AppSpacing.gutter,
-                          AppSpacing.section, AppSpacing.gutter, 0),
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.gutter,
+                        AppSpacing.section,
+                        AppSpacing.gutter,
+                        0,
+                      ),
                       sliver: SliverToBoxAdapter(
                         child: HomeEnvironmentCard(
                           insight: insights.homeInsight,
@@ -235,15 +299,20 @@ class _GreetingRow extends StatelessWidget {
               colors: [Color(0xFF9CCB6B), Color(0xFF7CB342)],
             ),
           ),
-          child: Text(initial, style: AppText.heading20.copyWith(fontSize: 18.5)),
+          child: Text(
+            initial,
+            style: AppText.heading20.copyWith(fontSize: 18.5),
+          ),
         ),
         const SizedBox(width: AppSpacing.md),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(AppDate.greeting(),
-                  style: AppText.body15.copyWith(fontSize: 15)),
+              Text(
+                AppDate.greeting(),
+                style: AppText.body15.copyWith(fontSize: 15),
+              ),
               Text(name, style: AppText.heading20.copyWith(fontSize: 18.5)),
             ],
           ),
@@ -259,10 +328,16 @@ class _GreetingRow extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const PgIcon(PgIcons.sun, size: 21, color: AppColors.cautionDeep),
+                const PgIcon(
+                  PgIcons.sun,
+                  size: 21,
+                  color: AppColors.cautionDeep,
+                ),
                 const SizedBox(width: AppSpacing.sm),
-                Text('$temperature°',
-                    style: AppText.heading17.copyWith(fontSize: 16.5)),
+                Text(
+                  '$temperature°',
+                  style: AppText.heading17.copyWith(fontSize: 16.5),
+                ),
               ],
             ),
           ),
@@ -332,13 +407,17 @@ class _AttentionSummary extends StatelessWidget {
                   const TextSpan(
                     text: 'Nothing needs attention',
                     style: TextStyle(
-                        color: AppColors.ink, fontWeight: FontWeight.w700),
+                      color: AppColors.ink,
+                      fontWeight: FontWeight.w700,
+                    ),
                   )
                 else ...[
                   TextSpan(
                     text: '$count plant${count == 1 ? '' : 's'}',
                     style: const TextStyle(
-                        color: AppColors.ink, fontWeight: FontWeight.w700),
+                      color: AppColors.ink,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   const TextSpan(text: ' need attention'),
                 ],
@@ -352,72 +431,95 @@ class _AttentionSummary extends StatelessWidget {
   }
 }
 
-class _AttentionCarousel extends StatelessWidget {
-  const _AttentionCarousel({required this.plants});
-
-  final List<Plant> plants;
-
-  @override
-  Widget build(BuildContext context) {
-    const cardWidth = 268.0;
-    return SizedBox(
-      height: 242,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.gutter),
-        itemCount: plants.length,
-        separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.lg),
-        itemBuilder: (context, index) => Entrance(
-          index: index,
-          child: SizedBox(
-            width: cardWidth,
-            child: HomeAttentionCard(
-              plant: plants[index],
-              highlighted: index == 0,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
+/// One of today's tasks. Four kinds share the row; a kind this build does
+/// not know still shows its own title and detail and can be completed.
 class _CareTaskRow extends StatelessWidget {
   const _CareTaskRow({
     required this.task,
     required this.onToggle,
     required this.onOpen,
+    this.onSkip,
+    this.planHeading,
   });
 
   final CareTask task;
   final VoidCallback onToggle;
   final VoidCallback onOpen;
 
+  /// Only a treatment step can be skipped.
+  final VoidCallback? onSkip;
+
+  /// Set on the first step of each plan, so the list reads in groups.
+  final String? planHeading;
+
   @override
   Widget build(BuildContext context) {
+    final heading = planHeading;
+    if (heading != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(
+                left: AppSpacing.xs, bottom: AppSpacing.sm),
+            child: CaptionLabel(heading, color: AppColors.healthyDeep),
+          ),
+          _CareTaskRow(
+            task: task,
+            onToggle: onToggle,
+            onOpen: onOpen,
+            onSkip: onSkip,
+          ),
+        ],
+      );
+    }
+
     final done = task.done;
     final kind = task.kind;
     final overdue = task.overdue;
+    // A step says which problem it serves; "All problems" is one shared
+    // instruction, shown once.
+    final detail = task.problem == null || task.problem!.isEmpty
+        ? task.detail
+        : '${task.problem} · ${task.detail}';
+    final (icon, tint, deep) = switch (kind) {
+      CareTaskKind.watering => (
+          PgIcons.droplet,
+          AppColors.waterTint,
+          AppColors.waterDeep
+        ),
+      CareTaskKind.condition => (
+          PgIcons.camera,
+          AppColors.cautionTint,
+          AppColors.cautionDeep
+        ),
+      CareTaskKind.treatmentStep => (
+          PgIcons.leaf,
+          AppColors.leafSoft,
+          AppColors.healthyDeep
+        ),
+      CareTaskKind.environment => (
+          PgIcons.thermometer,
+          AppColors.neutralTint,
+          AppColors.inkMuted
+        ),
+      CareTaskKind.unknown => (
+          PgIcons.calendar,
+          AppColors.neutralTint,
+          AppColors.inkMuted
+        ),
+    };
 
     return TileRow(
-      icon: kind == MetricKind.watering ? PgIcons.droplet : PgIcons.camera,
+      icon: icon,
       title: task.title,
-      detail: task.detail,
+      detail: detail,
       strikeThrough: done,
       background: done ? const Color(0xFFF7FAF9) : AppColors.surface,
       elevated: !done,
       detailColor: overdue ? AppColors.cautionDeep : null,
-      iconBackground: done
-          ? AppColors.softGreen
-          : kind == MetricKind.watering
-              ? AppColors.waterTint
-              : AppColors.cautionTint,
-      iconForeground: done
-          ? AppColors.healthyDeep
-          : kind == MetricKind.watering
-              ? AppColors.waterDeep
-              : AppColors.cautionDeep,
+      iconBackground: done ? AppColors.softGreen : tint,
+      iconForeground: done ? AppColors.healthyDeep : deep,
       leading: done
           ? Container(
               width: 52,
@@ -427,36 +529,47 @@ class _CareTaskRow extends StatelessWidget {
                 color: AppColors.softGreen,
                 borderRadius: BorderRadius.circular(AppRadius.tile),
               ),
-              child: const PgIcon(PgIcons.check,
-                  size: 24, color: AppColors.healthyDeep),
+              child: const PgIcon(
+                PgIcons.check,
+                size: 24,
+                color: AppColors.healthyDeep,
+              ),
             )
           : null,
-      onTap: done ? null : onOpen,
+      onTap: done
+          ? null
+          : onSkip != null
+              ? () => showTaskActions(context, task,
+                  onComplete: onToggle, onSkip: onSkip!)
+              : onOpen,
       trailing: done
           ? null
-          : kind == MetricKind.condition
-              ? CircleIconButton(
-                  icon: PgIcons.chevronRight,
-                  size: 46,
-                  background: AppColors.ink,
-                  foreground: AppColors.leaf,
-                  elevated: false,
-                  onPressed: onOpen,
-                )
-              : Pressable(
-                  onTap: onToggle,
-                  scale: 0.9,
-                  child: Container(
-                    width: 46,
-                    height: 46,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.line, width: 1.6),
-                    ),
-                    child: const PgIcon(PgIcons.check,
-                        size: 22, color: AppColors.inkMuted),
-                  ),
+          : kind == CareTaskKind.condition
+          ? CircleIconButton(
+              icon: PgIcons.chevronRight,
+              size: 46,
+              background: AppColors.ink,
+              foreground: AppColors.leaf,
+              elevated: false,
+              onPressed: onOpen,
+            )
+          : Pressable(
+              onTap: onToggle,
+              scale: 0.9,
+              child: Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.line, width: 1.6),
                 ),
+                child: const PgIcon(
+                  PgIcons.check,
+                  size: 22,
+                  color: AppColors.inkMuted,
+                ),
+              ),
+            ),
     );
   }
 }
@@ -501,17 +614,24 @@ class _AllCaughtUpCard extends StatelessWidget {
                     color: AppColors.ink,
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: const PgIcon(PgIcons.check,
-                      size: 24, color: AppColors.leaf),
+                  child: const PgIcon(
+                    PgIcons.check,
+                    size: 24,
+                    color: AppColors.leaf,
+                  ),
                 ),
                 const Spacer(),
-                Text('All caught up',
-                    style: AppText.title28.copyWith(fontSize: 24)),
+                Text(
+                  'All caught up',
+                  style: AppText.title28.copyWith(fontSize: 24),
+                ),
                 const SizedBox(height: AppSpacing.sm),
                 Text(
                   'Every plant is watered and checked in.',
-                  style: AppText.body15
-                      .copyWith(fontSize: 15, color: const Color(0xFF243517)),
+                  style: AppText.body15.copyWith(
+                    fontSize: 15,
+                    color: const Color(0xFF243517),
+                  ),
                 ),
               ],
             ),

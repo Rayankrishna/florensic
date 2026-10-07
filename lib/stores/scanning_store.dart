@@ -1,9 +1,14 @@
+import 'dart:io';
+
 import 'package:mobx/mobx.dart';
 
 import '../domain/models/plant.dart';
 import '../domain/repositories/identification_repository.dart';
-import '../domain/repositories/mock/mock_api_client.dart';
+import '../domain/repositories/remote/remote_identification_repository.dart';
 import '../enum.dart';
+import '../utils/app_log.dart';
+import '../interceptors/api_interceptor.dart';
+import '../shared/services/capture_service.dart';
 import 'plant_collection_store.dart';
 import 'permissions_store.dart';
 
@@ -15,28 +20,25 @@ class ScanningStore = _ScanningStore with _$ScanningStore;
 ///
 /// Identification is not performed on device. The repository returns a
 /// scripted match so the capture → result → add flow, and its offline and
-/// no-match states, are fully exercised against mock responses.
+/// no-match states, come from the identification service.
 abstract class _ScanningStore with Store {
   _ScanningStore(
     this._repository,
     this._collection,
     this._permissions,
-    this._client,
+    this._capture,
   );
 
   final IdentificationRepository _repository;
   final PlantCollectionStore _collection;
   final PermissionsStore _permissions;
-  final MockApiClient _client;
+  final CaptureService _capture;
 
   @observable
   ScanStatus status = ScanStatus.idle;
 
   @observable
   ScanTarget target = ScanTarget.leaf;
-
-  @observable
-  bool torchOn = false;
 
   @observable
   IdentificationResult? result;
@@ -46,6 +48,19 @@ abstract class _ScanningStore with Store {
 
   @observable
   bool isAdding = false;
+
+  /// The photo waiting to be identified, so the review UI can show it.
+  @observable
+  Capture? capture;
+
+  /// True while the camera or picker is open.
+  @observable
+  bool isCapturing = false;
+
+  /// Set when a permission was permanently refused — the sheet then offers
+  /// Settings rather than another prompt.
+  @observable
+  bool needsSettings = false;
 
   @computed
   bool get isScanning => status == ScanStatus.scanning;
@@ -72,50 +87,138 @@ abstract class _ScanningStore with Store {
   void setTarget(ScanTarget value) => target = value;
 
   @action
-  void toggleTorch() => torchOn = !torchOn;
-
-  @action
   void resetScan() {
     status = ScanStatus.idle;
     result = null;
     errorMessage = null;
+    capture = null;
+    needsSettings = false;
   }
 
-  /// Test hooks so the designed error states are reachable from the UI.
-  @action
-  void simulateOffline(bool value) => _client.offline = value;
-
-  @action
-  void simulateNoMatch(bool value) => _repository.alwaysFail = value;
-
+  /// Opens the system camera, then identifies whatever came back — the
+  /// fallback for when the in-app viewfinder has no camera to show.
   @action
   Future<void> scanPlant() async {
-    if (isScanning) return;
-    status = ScanStatus.scanning;
+    if (isScanning || isCapturing) return;
+    final taken = await _takePhoto(fromCamera: true);
+    if (taken == null) return;
+    await _identify();
+  }
+
+  /// Identifies a frame the in-app viewfinder just took.
+  @action
+  Future<void> identifyPhoto(File file) async {
+    if (isScanning || isCapturing) return;
+    isCapturing = true;
     errorMessage = null;
+    needsSettings = false;
     try {
-      final match = await _repository.identify(framing: target.name);
-      result = match;
-      status = ScanStatus.matched;
-    } on NoConfidentMatch catch (e) {
-      errorMessage = e.toString();
-      status = ScanStatus.noMatch;
-    } catch (e) {
-      errorMessage = e.toString();
-      status = ScanStatus.offline;
+      final taken = await _capture.fromViewfinder(file);
+      runInAction(() {
+        capture = taken;
+        _attachCapture(taken);
+      });
+    } finally {
+      runInAction(() => isCapturing = false);
     }
+    await _identify();
   }
 
   /// Picking an existing photo follows the same path as a capture.
   @action
   Future<void> selectImage() async {
-    if (!photoLibraryEnabled) {
-      errorMessage = 'Photo library access is off';
-      status = ScanStatus.noMatch;
+    if (isScanning || isCapturing) return;
+    final taken = await _takePhoto(fromCamera: false);
+    if (taken == null) return;
+    await _identify();
+  }
+
+  @action
+  Future<Capture?> _takePhoto({required bool fromCamera}) async {
+    isCapturing = true;
+    errorMessage = null;
+    needsSettings = false;
+    try {
+      final taken = fromCamera
+          ? await _capture.takePhoto()
+          : await _capture.pickFromGallery();
+      if (taken == null) return null; // Cancelled — stay on the viewfinder.
+      runInAction(() {
+        capture = taken;
+        _attachCapture(taken);
+      });
+      return taken;
+    } on PermissionPermanentlyDenied catch (e) {
+      AppLog.w('capture blocked: $e', name: 'scan');
+      runInAction(() {
+        errorMessage = e.toString();
+        needsSettings = true;
+        status = ScanStatus.noMatch;
+      });
+      return null;
+    } catch (e, stack) {
+      AppLog.e('capture failed', name: 'scan', error: e, stackTrace: stack);
+      runInAction(() {
+        errorMessage = e.toString();
+        status = ScanStatus.noMatch;
+      });
+      return null;
+    } finally {
+      runInAction(() => isCapturing = false);
+    }
+  }
+
+  /// Hands the frame to the repository, which uploads it.
+  void _attachCapture(Capture taken) {
+    final repository = _repository;
+    if (repository is RemoteIdentificationRepository) {
+      repository.pendingCapture = taken;
+    }
+  }
+
+  @action
+  Future<void> _identify() async {
+    status = ScanStatus.scanning;
+    errorMessage = null;
+
+    IdentificationResult match;
+    try {
+      match = await _repository.identify(framing: target.name);
+    } on NoConfidentMatch catch (e) {
+      AppLog.i('no confident match', name: 'scan');
+      runInAction(() {
+        errorMessage = e.toString();
+        status = ScanStatus.noMatch;
+      });
+      return;
+    } on ApiException catch (e) {
+      AppLog.e('identification failed', name: 'scan', error: e);
+      runInAction(() {
+        errorMessage = e.message;
+        status = e.isOffline ? ScanStatus.offline : ScanStatus.noMatch;
+      });
+      return;
+    } catch (e, stack) {
+      AppLog.e('identification failed',
+          name: 'scan', error: e, stackTrace: stack);
+      runInAction(() {
+        errorMessage = e.toString();
+        status = ScanStatus.offline;
+      });
       return;
     }
-    await scanPlant();
+
+    AppLog.i('matched ${match.species.commonName} at ${match.confidence}%',
+        name: 'scan');
+    runInAction(() {
+      result = match;
+      status = ScanStatus.matched;
+    });
   }
+
+  /// Sends the keeper to the OS settings page for a refused permission.
+  @action
+  Future<void> openSettings() => _capture.openSettings();
 
   @action
   Future<Plant?> addToCollection({String? nickname}) async {
@@ -125,7 +228,7 @@ abstract class _ScanningStore with Store {
     try {
       return await _collection.addPlant(match.species, nickname: nickname);
     } finally {
-      isAdding = false;
+      runInAction(() => isAdding = false);
     }
   }
 }

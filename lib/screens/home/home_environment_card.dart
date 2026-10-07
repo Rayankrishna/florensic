@@ -25,10 +25,13 @@ class HomeEnvironmentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (loading || insight == null || weather == null) {
+    if (loading) {
       return const Skeleton(height: 330, radius: AppRadius.card);
     }
-    final w = weather!;
+    // No insight and not loading means the backend has nothing to say today.
+    // A skeleton here would spin for ever, so the section simply goes away.
+    if (insight == null) return const SizedBox.shrink();
+    final w = weather;
     return DarkCard(
       glowAlignment: const Alignment(0.85, -0.9),
       glowRadius: 0.62,
@@ -43,29 +46,43 @@ class HomeEnvironmentCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const CaptionLabel('Environmental insight',
-                        color: Color(0xFF9AA69C)),
+                    const CaptionLabel(
+                      'Environmental insight',
+                      color: Color(0xFF9AA69C),
+                    ),
                     const SizedBox(height: AppSpacing.sm),
                     Text(
                       insight!.title,
-                      style: AppText.title28
-                          .copyWith(fontSize: 23, color: Colors.white),
+                      style: AppText.title28.copyWith(
+                        fontSize: 23,
+                        color: Colors.white,
+                      ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: AppSpacing.md),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text('${w.temperatureC}°',
-                      style: AppText.display40
-                          .copyWith(fontSize: 39, color: AppColors.leaf)),
-                  Text('Feels ${w.feelsLikeC}°',
+              if (w != null) ...[
+                const SizedBox(width: AppSpacing.md),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '${w.temperatureC}°',
+                      style: AppText.display40.copyWith(
+                        fontSize: 39,
+                        color: AppColors.leaf,
+                      ),
+                    ),
+                    Text(
+                      'Feels ${w.feelsLikeC}°',
                       style: AppText.body13.copyWith(
-                          fontSize: 13, color: const Color(0xFF9AA69C))),
-                ],
-              ),
+                        fontSize: 13,
+                        color: const Color(0xFF9AA69C),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
           const SizedBox(height: AppSpacing.lg),
@@ -76,16 +93,19 @@ class HomeEnvironmentCard extends StatelessWidget {
               color: Colors.white.withValues(alpha: 0.82),
             ),
           ),
-          const SizedBox(height: AppSpacing.xl),
-          Row(
-            children: [
-              _Stat(label: 'Humidity', value: '${w.humidity}%'),
-              const SizedBox(width: AppSpacing.md),
-              _Stat(label: 'UV index', value: w.uvLabel),
-              const SizedBox(width: AppSpacing.md),
-              _Stat(label: 'Rain', value: '${w.rainChance}%'),
-            ],
-          ),
+          // The stat row needs a weather reading, which has no endpoint yet.
+          if (w != null) ...[
+            const SizedBox(height: AppSpacing.xl),
+            Row(
+              children: [
+                _Stat(label: 'Humidity', value: '${w.humidity}%'),
+                const SizedBox(width: AppSpacing.md),
+                _Stat(label: 'UV index', value: w.uvLabel),
+                const SizedBox(width: AppSpacing.md),
+                _Stat(label: 'Rain', value: '${w.rainChance}%'),
+              ],
+            ),
+          ],
           const SizedBox(height: AppSpacing.xl),
           AppButton.primary(label: 'Open insights', onPressed: onOpen),
         ],
@@ -105,7 +125,9 @@ class _Stat extends StatelessWidget {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg, vertical: AppSpacing.lg),
+          horizontal: AppSpacing.lg,
+          vertical: AppSpacing.lg,
+        ),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.07),
           borderRadius: BorderRadius.circular(AppRadius.tile),
@@ -115,17 +137,23 @@ class _Stat extends StatelessWidget {
           children: [
             FittedBox(
               fit: BoxFit.scaleDown,
-              child: Text(label,
-                  style: AppText.body13
-                      .copyWith(fontSize: 12.5, color: const Color(0xFF9AA69C))),
+              child: Text(
+                label,
+                style: AppText.body13.copyWith(
+                  fontSize: 12.5,
+                  color: const Color(0xFF9AA69C),
+                ),
+              ),
             ),
             const SizedBox(height: AppSpacing.sm),
             FittedBox(
               fit: BoxFit.scaleDown,
               child: Text(
                 value,
-                style: AppText.heading17
-                    .copyWith(fontSize: 16.5, color: Colors.white),
+                style: AppText.heading17.copyWith(
+                  fontSize: 16.5,
+                  color: Colors.white,
+                ),
               ),
             ),
           ],

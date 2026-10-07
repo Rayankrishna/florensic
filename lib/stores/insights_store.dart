@@ -4,6 +4,8 @@ import '../domain/models/plant_insight.dart';
 import '../domain/models/weather_data.dart';
 import '../domain/repositories/insights_repository.dart';
 import '../enum.dart';
+import '../interceptors/api_interceptor.dart';
+import '../utils/app_log.dart';
 
 part 'insights_store.g.dart';
 
@@ -29,6 +31,19 @@ abstract class _InsightsStore with Store {
 
   @observable
   HomeEnvironmentInsight? homeInsight;
+
+  /// Shown wherever weather-driven text appears (`meta.attribution`).
+  @observable
+  String attribution = 'Weather data by Open-Meteo.com (CC BY 4.0)';
+
+  /// True when the backend has no weather reading for this build.
+  @computed
+  bool get weatherUnavailable => state == LoadState.ready && weather == null;
+
+  /// True when there is no environment history to chart yet.
+  @computed
+  bool get historyUnavailable =>
+      state == LoadState.ready && environmentHistory.isEmpty;
 
   @observable
   LoadState state = LoadState.idle;
@@ -68,25 +83,36 @@ abstract class _InsightsStore with Store {
     if (!force && state == LoadState.ready) return;
     state = LoadState.loading;
     errorMessage = null;
+
+    List<Object?> resp;
     try {
-      final results = await Future.wait<Object>([
+      resp = await Future.wait<Object?>([
         _repository.loadWeather(),
         _repository.loadInsights(),
         _repository.loadEnvironmentHistory(),
         _repository.loadCorrelation(),
         _repository.loadHomeInsight(),
       ]);
-      weather = results[0] as WeatherData;
-      insights = ObservableList<EnvironmentalInsight>.of(
-          results[1] as List<EnvironmentalInsight>);
-      environmentHistory =
-          ObservableList<EnvPoint>.of(results[2] as List<EnvPoint>);
-      correlation = results[3] as HealthCorrelation;
-      homeInsight = results[4] as HomeEnvironmentInsight;
-      state = LoadState.ready;
-    } catch (e) {
-      errorMessage = e.toString();
-      state = LoadState.error;
+    } catch (e, stack) {
+      AppLog.e('loading insights failed',
+          name: 'insights', error: e, stackTrace: stack);
+      runInAction(() {
+        errorMessage = e is ApiException ? e.message : e.toString();
+        if (insights.isEmpty) state = LoadState.error;
+      });
+      return;
     }
+
+    runInAction(() {
+      weather = resp[0] as WeatherData?;
+      insights = ObservableList<EnvironmentalInsight>.of(
+          resp[1]! as List<EnvironmentalInsight>);
+      environmentHistory =
+          ObservableList<EnvPoint>.of(resp[2]! as List<EnvPoint>);
+      correlation = resp[3] as HealthCorrelation?;
+      homeInsight = resp[4] as HomeEnvironmentInsight?;
+      attribution = _repository.attribution;
+      state = LoadState.ready;
+    });
   }
 }

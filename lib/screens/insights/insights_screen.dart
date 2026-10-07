@@ -4,6 +4,7 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import '../../domain/models/plant_insight.dart';
 import '../../enum.dart';
 import '../../locator.dart';
+import '../../shared/components/app_chip.dart';
 import '../../shared/components/app_surfaces.dart';
 import '../../shared/components/headers.dart';
 import '../../shared/components/list_rows.dart';
@@ -29,10 +30,14 @@ class InsightsScreen extends StatelessWidget {
         bottom: false,
         child: Observer(
           builder: (context) {
-            if (store.isLoading && store.weather == null) {
+            if (store.isLoading && store.insights.isEmpty) {
               return ListView(
-                padding: EdgeInsets.fromLTRB(AppSpacing.gutter, AppSpacing.xxl,
-                    AppSpacing.gutter, navClearance(context)),
+                padding: EdgeInsets.fromLTRB(
+                  AppSpacing.gutter,
+                  AppSpacing.xxl,
+                  AppSpacing.gutter,
+                  navClearance(context),
+                ),
                 children: const [
                   Skeleton(width: 190, height: 42),
                   SizedBox(height: AppSpacing.xl),
@@ -45,18 +50,28 @@ class InsightsScreen extends StatelessWidget {
               );
             }
 
-            final weather = store.weather;
-            if (weather == null) {
+            if (store.state == LoadState.error) {
               return Center(
-                child: Text(store.errorMessage ?? 'No readings yet',
-                    style: AppText.body15),
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.gutter),
+                  child: Text(
+                    store.errorMessage ?? 'Insights are unavailable.',
+                    textAlign: TextAlign.center,
+                    style: AppText.body15.copyWith(fontSize: 15),
+                  ),
+                ),
               );
             }
+            final weather = store.weather;
 
             return ListView(
               physics: const BouncingScrollPhysics(),
-              padding: EdgeInsets.fromLTRB(AppSpacing.gutter, AppSpacing.xxl,
-                  AppSpacing.gutter, navClearance(context)),
+              padding: EdgeInsets.fromLTRB(
+                AppSpacing.gutter,
+                AppSpacing.xxl,
+                AppSpacing.gutter,
+                navClearance(context),
+              ),
               children: [
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -64,99 +79,128 @@ class InsightsScreen extends StatelessWidget {
                     const Expanded(
                       child: Text('Insights', style: AppText.display40),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.lg, vertical: 12),
-                      decoration: const BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: AppRadius.pillR,
-                        boxShadow: AppShadows.raised,
+                    // The city comes from the weather reading, which the backend does
+                    // not serve yet.
+                    if (weather != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.lg,
+                          vertical: 12,
+                        ),
+                        decoration: const BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: AppRadius.pillR,
+                          boxShadow: AppShadows.raised,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const PgIcon(
+                              PgIcons.pin,
+                              size: 19,
+                              color: AppColors.ink,
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            Text(
+                              weather.city,
+                              style: AppText.heading17.copyWith(fontSize: 15),
+                            ),
+                          ],
+                        ),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const PgIcon(PgIcons.pin,
-                              size: 19, color: AppColors.ink),
-                          const SizedBox(width: AppSpacing.sm),
-                          Text(weather.city,
-                              style: AppText.heading17.copyWith(fontSize: 15)),
-                        ],
-                      ),
-                    ),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.sm),
-                Text('Understand what your plants need',
-                    style: AppText.body15.copyWith(fontSize: 16)),
+                Text(
+                  'Understand what your plants need',
+                  style: AppText.body15.copyWith(fontSize: 16),
+                ),
                 const SizedBox(height: AppSpacing.xl),
-                DarkCard(
-                  glow: const Color(0xFFF1B33C),
-                  glowAlignment: const Alignment(0.72, -0.5),
-                  glowOpacity: 0.34,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const CaptionLabel('Right now',
-                                    color: Color(0xFF9AA69C)),
-                                const SizedBox(height: AppSpacing.md),
-                                Text('${weather.temperatureC}°',
-                                    style: AppText.display40.copyWith(
-                                        fontSize: 52, color: Colors.white)),
-                                const SizedBox(height: AppSpacing.sm),
-                                Text(
-                                  '${weather.condition} · feels '
-                                  '${weather.feelsLikeC}°',
-                                  style: AppText.body15.copyWith(
-                                    fontSize: 16,
-                                    color:
-                                        Colors.white.withValues(alpha: 0.82),
+                if (weather != null)
+                  DarkCard(
+                    glow: const Color(0xFFF1B33C),
+                    glowAlignment: const Alignment(0.72, -0.5),
+                    glowOpacity: 0.34,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const CaptionLabel(
+                                    'Right now',
+                                    color: Color(0xFF9AA69C),
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(height: AppSpacing.md),
+                                  Text(
+                                    '${weather.temperatureC}°',
+                                    style: AppText.display40.copyWith(
+                                      fontSize: 52,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  const SizedBox(height: AppSpacing.sm),
+                                  Text(
+                                    '${weather.condition} · feels '
+                                    '${weather.feelsLikeC}°',
+                                    style: AppText.body15.copyWith(
+                                      fontSize: 16,
+                                      color: Colors.white.withValues(
+                                        alpha: 0.82,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                          const PgIcon(PgIcons.sun,
-                              size: 54, color: AppColors.leaf),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.xl),
-                      Row(
-                        children: [
-                          _WeatherStat(
+                            const PgIcon(
+                              PgIcons.sun,
+                              size: 54,
+                              color: AppColors.leaf,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.xl),
+                        Row(
+                          children: [
+                            _WeatherStat(
                               icon: PgIcons.droplet,
                               iconColor: AppColors.water,
                               value: '${weather.humidity}%',
-                              label: 'Humidity'),
-                          const SizedBox(width: AppSpacing.sm),
-                          _WeatherStat(
+                              label: 'Humidity',
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            _WeatherStat(
                               icon: PgIcons.cloudRain,
                               iconColor: AppColors.water,
                               value: '${weather.rainChance}%',
-                              label: 'Rain'),
-                          const SizedBox(width: AppSpacing.sm),
-                          _WeatherStat(
+                              label: 'Rain',
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            _WeatherStat(
                               icon: PgIcons.sunLow,
                               iconColor: AppColors.caution,
                               value: '${weather.uvIndex}',
-                              label: 'UV index'),
-                          const SizedBox(width: AppSpacing.sm),
-                          _WeatherStat(
+                              label: 'UV index',
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            _WeatherStat(
                               icon: PgIcons.wind,
                               iconColor: AppColors.leaf,
                               value: '${weather.windKph} km/h',
-                              label: 'Wind'),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
+                              label: 'Wind',
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  const _WeatherUnavailable(),
                 const SizedBox(height: AppSpacing.section),
                 SectionHeader(
                   title: "Today's insights",
@@ -174,46 +218,122 @@ class InsightsScreen extends StatelessWidget {
                 const SizedBox(height: AppSpacing.section),
                 const SectionHeader(title: 'Environmental history'),
                 const SizedBox(height: AppSpacing.lg),
-                AppCard(
-                  padding: const EdgeInsets.fromLTRB(
+                if (store.environmentHistory.isEmpty)
+                  const _SectionUnavailable(
+                    icon: PgIcons.chart,
+                    message:
+                        'Environment history will appear here once the '
+                        'readings start coming through.',
+                  )
+                else
+                  AppCard(
+                    padding: const EdgeInsets.fromLTRB(
                       AppSpacing.cardPadding,
                       AppSpacing.cardPadding,
                       AppSpacing.cardPadding,
-                      AppSpacing.xl),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        children: [
-                          _LegendKey(
-                              color: AppColors.caution, label: 'Temperature'),
-                          SizedBox(width: AppSpacing.xl),
-                          _LegendKey(
-                              color: AppColors.water, label: 'Humidity'),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.xl),
-                      DualSeriesChart(
-                        primary: store.environmentHistory
-                            .map((e) => e.temperatureC)
-                            .toList(),
-                        secondary: store.environmentHistory
-                            .map((e) => e.humidity)
-                            .toList(),
-                        labels: store.environmentHistory
-                            .map((e) => '${e.day}')
-                            .toList(),
-                      ),
-                    ],
+                      AppSpacing.xl,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            _LegendKey(
+                              color: AppColors.caution,
+                              label: 'Temperature',
+                            ),
+                            SizedBox(width: AppSpacing.xl),
+                            _LegendKey(
+                              color: AppColors.water,
+                              label: 'Humidity',
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.xl),
+                        DualSeriesChart(
+                          primary: store.environmentHistory
+                              .map((e) => e.temperatureC)
+                              .toList(),
+                          secondary: store.environmentHistory
+                              .map((e) => e.humidity)
+                              .toList(),
+                          labels: store.environmentHistory
+                              .map((e) => '${e.day}')
+                              .toList(),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
                 const SizedBox(height: AppSpacing.lg),
                 if (store.correlation != null)
                   _CorrelationCard(correlation: store.correlation!),
+                const SizedBox(height: AppSpacing.lg),
+                Text(
+                  store.attribution,
+                  style: AppText.body13.copyWith(fontSize: 12),
+                ),
               ],
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+/// The weather card has no endpoint yet, so the space says so plainly
+/// rather than showing a reading the backend never sent.
+class _WeatherUnavailable extends StatelessWidget {
+  const _WeatherUnavailable();
+
+  @override
+  Widget build(BuildContext context) {
+    return DarkCard(
+      glow: AppColors.leaf,
+      glowAlignment: const Alignment(0.72, -0.5),
+      glowOpacity: 0.20,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const CaptionLabel('Right now', color: Color(0xFF9AA69C)),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            'Live weather is on the way',
+            style: AppText.title28.copyWith(fontSize: 24, color: Colors.white),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Your plants\' care already follows the weather — the reading '
+            'itself is not available in the app yet.',
+            style: AppText.body15.copyWith(
+              fontSize: 15,
+              color: Colors.white.withValues(alpha: 0.78),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A quiet placeholder for a section the backend cannot fill yet.
+class _SectionUnavailable extends StatelessWidget {
+  const _SectionUnavailable({required this.icon, required this.message});
+
+  final PgIcons icon;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Row(
+        children: [
+          IconTile(icon: icon, tone: MetricStatus.neutral),
+          const SizedBox(width: AppSpacing.lg),
+          Expanded(
+            child: Text(message, style: AppText.body13.copyWith(fontSize: 14)),
+          ),
+        ],
       ),
     );
   }
@@ -237,7 +357,9 @@ class _WeatherStat extends StatelessWidget {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.sm, vertical: AppSpacing.lg),
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.lg,
+        ),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.07),
           borderRadius: BorderRadius.circular(AppRadius.tile),
@@ -247,15 +369,23 @@ class _WeatherStat extends StatelessWidget {
             PgIcon(icon, size: 21, color: iconColor),
             const SizedBox(height: AppSpacing.md),
             FittedBox(
-              child: Text(value,
-                  style: AppText.heading17
-                      .copyWith(fontSize: 16, color: Colors.white)),
+              child: Text(
+                value,
+                style: AppText.heading17.copyWith(
+                  fontSize: 16,
+                  color: Colors.white,
+                ),
+              ),
             ),
             const SizedBox(height: 2),
             FittedBox(
-              child: Text(label,
-                  style: AppText.body13.copyWith(
-                      fontSize: 12, color: const Color(0xFF9AA69C))),
+              child: Text(
+                label,
+                style: AppText.body13.copyWith(
+                  fontSize: 12,
+                  color: const Color(0xFF9AA69C),
+                ),
+              ),
             ),
           ],
         ),
@@ -307,8 +437,10 @@ class _LegendKey extends StatelessWidget {
         Container(
           width: 18,
           height: 4,
-          decoration:
-              BoxDecoration(color: color, borderRadius: AppRadius.pillR),
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: AppRadius.pillR,
+          ),
         ),
         const SizedBox(width: AppSpacing.sm),
         Text(label, style: AppText.body15Ink.copyWith(fontSize: 15)),
@@ -332,24 +464,33 @@ class _CorrelationCard extends StatelessWidget {
         children: [
           const CaptionLabel('Health correlation', color: Color(0xFF4C6117)),
           const SizedBox(height: AppSpacing.md),
-          Text(correlation.headline,
-              style: AppText.title28.copyWith(fontSize: 23)),
+          Text(
+            correlation.headline,
+            style: AppText.title28.copyWith(fontSize: 23),
+          ),
           const SizedBox(height: AppSpacing.md),
-          Text(correlation.body,
-              style: AppText.body15
-                  .copyWith(fontSize: 15, color: const Color(0xFF3F5015))),
+          Text(
+            correlation.body,
+            style: AppText.body15.copyWith(
+              fontSize: 15,
+              color: const Color(0xFF3F5015),
+            ),
+          ),
           const SizedBox(height: AppSpacing.xl),
           Row(
             children: [
               Expanded(
                 child: _CorrelationStat(
-                    label: 'Humid weeks',
-                    value: correlation.humidWeeksScore),
+                  label: 'Humid weeks',
+                  value: correlation.humidWeeksScore,
+                ),
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: _CorrelationStat(
-                    label: 'Dry weeks', value: correlation.dryWeeksScore),
+                  label: 'Dry weeks',
+                  value: correlation.dryWeeksScore,
+                ),
               ),
             ],
           ),

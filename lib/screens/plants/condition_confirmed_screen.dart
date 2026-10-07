@@ -22,6 +22,7 @@ class ConditionConfirmedScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final score = store.newScore ?? 0;
+    // Null on a first scored check-in: there was nothing to move from.
     final delta = store.scoreDelta;
     final plant = store.plant;
 
@@ -68,7 +69,13 @@ class ConditionConfirmedScreen extends StatelessWidget {
                       style: AppText.display40.copyWith(fontSize: 33.5)),
                   const SizedBox(height: AppSpacing.md),
                   Text(
-                    'Your plant health history has been refreshed.',
+                    store.provisional
+                        ? 'We could not see much in that photo, so the '
+                            'score is held lightly. Try another when you can.'
+                        : store.verdictDisagreement
+                            ? 'Our look at the photo differs from yours. '
+                                'Both verdicts are on the record.'
+                            : 'Your plant health history has been refreshed.',
                     textAlign: TextAlign.center,
                     style: AppText.body15.copyWith(fontSize: 16),
                   ),
@@ -98,20 +105,23 @@ class ConditionConfirmedScreen extends StatelessWidget {
                                           style: AppText.metric
                                               .copyWith(fontSize: 35.5),
                                         ),
-                                        const SizedBox(width: 6),
-                                        Padding(
-                                          padding:
-                                              const EdgeInsets.only(bottom: 6),
-                                          child: Text(
-                                            delta >= 0 ? '+$delta' : '$delta',
-                                            style: AppText.heading17.copyWith(
-                                              fontSize: 16,
-                                              color: delta >= 0
-                                                  ? AppColors.healthyDeep
-                                                  : AppColors.criticalDeep,
+                                        if (delta != null) ...[
+                                          const SizedBox(width: 6),
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                                bottom: 6),
+                                            child: Text(
+                                              delta >= 0 ? '+$delta' : '$delta',
+                                              style:
+                                                  AppText.heading17.copyWith(
+                                                fontSize: 16,
+                                                color: delta >= 0
+                                                    ? AppColors.healthyDeep
+                                                    : AppColors.criticalDeep,
+                                              ),
                                             ),
                                           ),
-                                        ),
+                                        ],
                                       ],
                                     ),
                                   ],
