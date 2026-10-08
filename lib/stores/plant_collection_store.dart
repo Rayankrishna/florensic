@@ -281,10 +281,45 @@ abstract class _PlantCollectionStore with Store {
     }
   }
 
+  /// Ticks a task on today's list. Never throws: a task the server no
+  /// longer has on today's list (`404 task_not_found`) just means the list
+  /// is stale, so it is refetched; any other failure reverts the tick and
+  /// surfaces the message.
   @action
   Future<void> completeTask(String taskId) async {
+    final i = tasks.indexWhere((t) => t.id == taskId);
+    if (i == -1) {
+      // Not on the list we hold (a check-in started from the plant screen,
+      // say). The server already knows; just bring the list up to date.
+      await refreshTodaysCare();
+      return;
+    }
+    final before = tasks[i];
+    if (before.done) return;
     _completeLocalTask(taskId);
-    await _repository.completeTask(taskId);
+    try {
+      await _repository.completeTask(taskId);
+    } on ApiException catch (e) {
+      AppLog.w('completing $taskId failed: ${e.code} — ${e.message}',
+          name: 'plants');
+      if (e.statusCode == 404) {
+        await refreshTodaysCare();
+        return;
+      }
+      runInAction(() {
+        final j = tasks.indexWhere((t) => t.id == taskId);
+        if (j != -1) tasks[j] = before;
+        errorMessage = e.message;
+      });
+    } catch (e, stack) {
+      AppLog.e('completing $taskId failed',
+          name: 'plants', error: e, stackTrace: stack);
+      runInAction(() {
+        final j = tasks.indexWhere((t) => t.id == taskId);
+        if (j != -1) tasks[j] = before;
+        errorMessage = e.toString();
+      });
+    }
   }
 
   /// Treatment steps only. The step is recorded as skipped and leaves today's

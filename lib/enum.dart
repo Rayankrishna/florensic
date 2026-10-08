@@ -69,8 +69,23 @@ enum CareEventType {
   other,
 }
 
-/// Runtime permissions requested during setup.
-enum PermissionKind { location, reminders, camera, photoLibrary }
+/// Runtime permissions asked for during setup, in the order they are shown.
+/// Reminders are not here: nothing sends one yet, so there is nothing to ask
+/// for.
+enum PermissionKind { camera, photoLibrary, location }
+
+/// What the OS says about one permission.
+enum PermissionState {
+  /// Not read yet.
+  unknown,
+  granted,
+
+  /// Refused, or never asked — the system prompt can still be shown.
+  denied,
+
+  /// Refused for good — only Settings can change it.
+  blocked,
+}
 
 /// Generic async lifecycle used by the stores.
 enum LoadState { idle, loading, ready, empty, error }
@@ -151,7 +166,6 @@ extension ConditionVerdictX on ConditionVerdict {
 extension PermissionKindX on PermissionKind {
   String get title => switch (this) {
         PermissionKind.location => 'Local weather',
-        PermissionKind.reminders => 'Care reminders',
         PermissionKind.camera => 'Camera',
         PermissionKind.photoLibrary => 'Photo library',
       };
@@ -159,8 +173,6 @@ extension PermissionKindX on PermissionKind {
   String get body => switch (this) {
         PermissionKind.location =>
           'Allow location access to provide weather-aware care insights.',
-        PermissionKind.reminders =>
-          'A quiet nudge when watering or a condition update is due.',
         PermissionKind.camera =>
           'Needed to identify plants and log condition photos.',
         PermissionKind.photoLibrary =>

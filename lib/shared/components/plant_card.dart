@@ -5,6 +5,7 @@ import '../../domain/models/plant_species.dart';
 import '../../enum.dart';
 import '../../key.dart';
 import '../../theme.dart';
+import '../widgets/auth_image.dart';
 import '../widgets/plant_artwork.dart';
 import 'app_chip.dart';
 import 'pressable.dart';
@@ -39,11 +40,7 @@ class PlantCard extends StatelessWidget {
                 children: [
                   Hero(
                     tag: AppKeys.plantHero(plant.id),
-                    child: PlantArtwork(
-                      glyph: plant.species.glyph,
-                      ground: plant.species.ground,
-                      inset: 0.08,
-                    ),
+                    child: _cover(plant),
                   ),
                   Positioned(
                     top: AppSpacing.md,
@@ -87,6 +84,19 @@ class PlantCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The newest photo when the plant has one; the drawn artwork stands in
+/// while it loads, when it fails, and for a plant kept without a photo.
+Widget _cover(Plant plant) {
+  final artwork = PlantArtwork(
+    glyph: plant.species.glyph,
+    ground: plant.species.ground,
+    inset: 0.08,
+  );
+  final cover = plant.coverPhoto;
+  if (cover == null) return artwork;
+  return AuthImage(url: cover.thumb, fallback: artwork);
 }
 
 class _ScoreBadge extends StatelessWidget {
@@ -147,10 +157,13 @@ class SpeciesCard extends StatelessWidget {
                 children: [
                   Hero(
                     tag: AppKeys.speciesHero(species.id),
-                    child: PlantArtwork(
-                      glyph: species.glyph,
-                      ground: species.ground,
-                      inset: 0.08,
+                    child: PhotoOrArtwork(
+                      url: species.imageUrl,
+                      artwork: PlantArtwork(
+                        glyph: species.glyph,
+                        ground: species.ground,
+                        inset: 0.08,
+                      ),
                     ),
                   ),
                   Positioned(

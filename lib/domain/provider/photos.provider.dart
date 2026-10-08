@@ -7,6 +7,7 @@ import '../core/json.dart';
 import '../core/services_config.dart';
 import '../models/plant.dart';
 import '../models/plant_condition_update.dart';
+import '../models/plant_photo.dart';
 import '../models/plant_species.dart';
 
 /// Where a photo came from and what it is for.
@@ -196,6 +197,14 @@ class PhotosProvider {
       body: form,
     );
   }
+
+  /// Every photo of a plant, newest first, with its image routes.
+  Future<List<PlantPhoto>> forPlant(String plantId) => _http.get(
+        '/plants/$plantId/photos',
+        (json) => Json.list(json is Map ? json['items'] : json)
+            .map(PlantPhoto.fromJson)
+            .toList(),
+      );
 
   Future<AnalysisJob> job(String jobId) => _http.get(
         '/analysis/$jobId',

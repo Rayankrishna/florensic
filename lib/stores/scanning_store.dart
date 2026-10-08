@@ -113,7 +113,8 @@ abstract class _ScanningStore with Store {
     errorMessage = null;
     needsSettings = false;
     try {
-      final taken = await _capture.fromViewfinder(file);
+      final taken =
+          await _capture.located(await _capture.fromViewfinder(file));
       runInAction(() {
         capture = taken;
         _attachCapture(taken);
@@ -139,10 +140,13 @@ abstract class _ScanningStore with Store {
     errorMessage = null;
     needsSettings = false;
     try {
-      final taken = fromCamera
+      final picked = fromCamera
           ? await _capture.takePhoto()
           : await _capture.pickFromGallery();
-      if (taken == null) return null; // Cancelled — stay on the viewfinder.
+      if (picked == null) return null; // Cancelled — stay on the viewfinder.
+      // On screen at once — held and blurred — while the location follows.
+      runInAction(() => capture = picked);
+      final taken = await _capture.located(picked);
       runInAction(() {
         capture = taken;
         _attachCapture(taken);

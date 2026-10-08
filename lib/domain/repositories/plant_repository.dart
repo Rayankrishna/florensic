@@ -2,6 +2,7 @@ import '../../enum.dart';
 import '../models/care_task.dart';
 import '../models/plant.dart';
 import '../models/plant_condition_update.dart';
+import '../models/plant_photo.dart';
 import '../models/plant_species.dart';
 import '../models/treatment.dart';
 
@@ -30,6 +31,10 @@ abstract class PlantRepository {
 
   /// Paused plants only; a stale plant comes back through a check-in.
   Future<Plant> resumeActiveCare(String plantId);
+
+  /// The plant's photos, newest first. Detail and gallery screens only; a
+  /// list uses the plant's `coverPhoto`.
+  Future<List<PlantPhoto>> loadPhotos(String plantId);
 
   /// The per-problem rows. Kept for "has this plant had thrips before?".
   Future<List<Treatment>> loadTreatments(String plantId);

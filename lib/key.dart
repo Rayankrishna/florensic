@@ -9,7 +9,6 @@ class StorageKeys {
 
   static const String onboardingComplete = 'pg.onboarding.complete';
   static const String permissionsComplete = 'pg.permissions.complete';
-  static const String grantedPermissions = 'pg.permissions.granted';
   static const String authToken = 'pg.auth.token';
   static const String userName = 'pg.user.name';
   static const String userEmail = 'pg.user.email';

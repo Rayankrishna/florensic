@@ -52,6 +52,7 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
       );
     }
     _store.loadCourses();
+    _store.loadPhotos();
   }
 
   Future<void> _water() async {
@@ -157,6 +158,8 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                           ),
                           sliver: SliverList.list(
                             children: [
+                              PlantPhotoCard(plant: plant),
+                              const SizedBox(height: AppSpacing.lg),
                               // Branch on care status for paused; a null
                               // score means never scored, not paused.
                               if (_store.isPaused)
@@ -215,7 +218,10 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                                   trailing: '${plant.photoCount} photos',
                                 ),
                                 const SizedBox(height: AppSpacing.lg),
-                                ConditionHistoryStrip(plant: plant),
+                                ConditionHistoryStrip(
+                                  plant: plant,
+                                  photos: _store.photos,
+                                ),
                               ],
                             ],
                           ),

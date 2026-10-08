@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../domain/models/plant_species.dart';
 import '../../theme.dart';
+import '../widgets/auth_image.dart';
 import '../widgets/plant_artwork.dart';
 import 'app_button.dart';
 import 'app_text_field.dart';
@@ -79,10 +80,13 @@ class _AddPlantSheetState extends State<AddPlantSheet> {
                       child: SizedBox(
                         width: 72,
                         height: 72,
-                        child: PlantArtwork(
-                          glyph: widget.species.glyph,
-                          ground: widget.species.ground,
-                          inset: 0.16,
+                        child: PhotoOrArtwork(
+                          url: widget.species.imageUrl,
+                          artwork: PlantArtwork(
+                            glyph: widget.species.glyph,
+                            ground: widget.species.ground,
+                            inset: 0.16,
+                          ),
                         ),
                       ),
                     ),

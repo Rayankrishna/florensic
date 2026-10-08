@@ -13,8 +13,8 @@ up to that date still holds except what is listed below. Migration 0020 rebuilt 
 `health_score` is the same field in the same place on the same responses and it now means
 **what the photograph showed, blended into what we already believed**, so a number your app
 stored before this will not line up with one it fetches after. Every field named here is already
-live on the test server, and the server has not moved (same ngrok setup, see
-[`docs/ngrok-testing.md`](ngrok-testing.md)).
+live on the test server at `http://13.202.212.73:8012` — a fixed address now, no tunnel; see
+[`frontend-server-handoff.md`](frontend-server-handoff.md) for the base URL and how to load images.
 
 ## 2. Breaking changes, update these or the app misreads data
 
@@ -201,6 +201,14 @@ the duplicated steps merged and the day-one pile spread out.
 
 ## 4. New fields you can show without new calls
 
+- **`cover_photo`** on every `Plant` (list, detail, create): the newest photo as
+  `{photo_id, thumb, working, captured_at}`, `null` when the plant has no photo. Use it for
+  the grid and the card instead of calling `/plants/{id}/photos` per plant.
+- **Photo links now point at the API, not at storage.** `urls.*` and `cover_photo.*` are
+  `GET /v1/photos/{id}/{variant}` on the same base URL you call everything else on, and they
+  need your bearer token (`Image.network(url, headers: …)`). This is what makes images load on
+  a phone against the test server. Production will hand out signed storage links in the same
+  fields; treat both as short-lived.
 - **`breakdown`** on a `HealthPoint` is every number that day's `score` was made of, so a score
   can be explained without re-running anything. It is `null` on a day nothing scored (a
   carry-forward, or anything before the scorer recorded one), and its shape is versioned
@@ -274,6 +282,8 @@ documented in §4 and §7 of the API guide rather than in its §9 table.
 
 - [ ] Send `PATCH /v1/me {timezone}` with the device zone right after the first token exchange, and whenever it differs from `Me.timezone`.
 - [ ] Add `timezone` to `UserProfile` / `Me` (required, IANA string).
+- [ ] Add `coverPhoto` (nullable: `photoId`, `thumb`, `working`, `capturedAt`) to `Plant` and render it on the card and grid.
+- [ ] Send the bearer token when loading any photo URL (`urls.*`, `coverPhoto.*`); do not cache the URLs across sessions.
 - [ ] Make `Plant.healthBand` nullable and delete the `"paused"` band from the enum and from the band switch.
 - [ ] Stop reading `health_score == null` as paused; branch on `care_status` everywhere.
 - [ ] Widen `care_status` to `active | stale | paused` with an unknown fallback, and order badges `active -> stale -> paused`.

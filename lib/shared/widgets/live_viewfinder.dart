@@ -49,14 +49,36 @@ class LiveViewfinderController extends ChangeNotifier {
   bool _torchOn = false;
   bool _opening = false;
   bool _disposed = false;
+  File? _heldFile;
 
   CameraController? get camera => _camera;
   ViewfinderState get state => _state;
   bool get torchOn => _torchOn;
   bool get isLive => _state == ViewfinderState.live && _camera != null;
 
-  /// True while the preview is paused on the frame that was just taken.
-  bool get isHeld => _camera?.value.isPreviewPaused ?? false;
+  /// A photo that did not come from the shutter (picked from the library)
+  /// but is being worked on just the same: shown in place of the feed,
+  /// blurred, until [resumePreview].
+  File? get heldFile => _heldFile;
+
+  /// True while the viewfinder is holding on a frame — a shot the preview
+  /// is paused on, or a picked photo.
+  bool get isHeld =>
+      _heldFile != null || (_camera?.value.isPreviewPaused ?? false);
+
+  /// Holds [file] as the frame, the way the shutter holds the frame it took.
+  /// Pauses the live preview too, if there is one, so nothing runs behind.
+  Future<void> holdFile(File file) async {
+    _heldFile = file;
+    _notify();
+    final camera = _camera;
+    if (camera != null && !camera.value.isPreviewPaused) {
+      await camera.pausePreview().catchError(
+        (_) {},
+        test: (e) => e is CameraException,
+      );
+    }
+  }
 
   /// Asks for access (unless [prompt] is false, for a resume from Settings,
   /// where prompting would reopen the dialog as it closes) and opens the
@@ -107,6 +129,14 @@ class LiveViewfinderController extends ChangeNotifier {
       _camera = camera;
       _set(ViewfinderState.live);
       await _applyTorch();
+      // Reopened (after the library picker, say) while a picked photo is
+      // held: nothing should run behind the held frame.
+      if (_heldFile != null) {
+        await camera.pausePreview().catchError(
+          (_) {},
+          test: (e) => e is CameraException,
+        );
+      }
     } on CameraException catch (e) {
       AppLog.w('viewfinder unavailable: ${e.code}', name: 'camera');
       _set(e.code.contains('AccessDenied')
@@ -175,6 +205,7 @@ class LiveViewfinderController extends ChangeNotifier {
   Future<File?> takePicture() async {
     final camera = _camera;
     if (camera == null ||
+        _heldFile != null ||
         camera.value.isTakingPicture ||
         camera.value.isPreviewPaused) {
       return null;
@@ -196,8 +227,13 @@ class LiveViewfinderController extends ChangeNotifier {
     return File(shot.path);
   }
 
-  /// Lets the preview run again after a held frame was not kept.
+  /// Lets the preview run again after a held frame — shot or picked — was
+  /// not kept.
   Future<void> resumePreview() async {
+    if (_heldFile != null) {
+      _heldFile = null;
+      _notify();
+    }
     final camera = _camera;
     if (camera == null || !camera.value.isPreviewPaused) return;
     try {
@@ -236,10 +272,16 @@ class LiveViewfinder extends StatefulWidget {
   const LiveViewfinder({
     super.key,
     required this.controller,
+    this.heldFile,
     this.standInGlyph = PlantGlyph.monstera,
   });
 
   final LiveViewfinderController controller;
+
+  /// A photo that did not come from the shutter (picked from the library)
+  /// but is being worked on just the same: shown in place of the feed,
+  /// blurred, for as long as it is passed. Pass null to let the feed run.
+  final File? heldFile;
 
   /// Drawn on the stand-in when there is no camera to show.
   final PlantGlyph standInGlyph;
@@ -257,7 +299,21 @@ class _LiveViewfinderState extends State<LiveViewfinder>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _controller.addListener(_rebuild);
+    final held = widget.heldFile;
+    if (held != null) _controller.holdFile(held);
     _controller.open();
+  }
+
+  @override
+  void didUpdateWidget(LiveViewfinder oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final held = widget.heldFile;
+    if (oldWidget.heldFile?.path == held?.path) return;
+    if (held != null) {
+      _controller.holdFile(held);
+    } else {
+      _controller.resumePreview();
+    }
   }
 
   @override
@@ -291,14 +347,109 @@ class _LiveViewfinderState extends State<LiveViewfinder>
   @override
   Widget build(BuildContext context) {
     final camera = _controller.camera;
+    // The parameter wins so a held photo shows on the very build that
+    // passes it, before the controller has caught up.
+    final held = widget.heldFile ?? _controller.heldFile;
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 280),
-      child: camera != null && _controller.isLive
-          ? _Feed(key: ValueKey(camera), controller: camera)
-          : _StandIn(
-              glyph: widget.standInGlyph,
-              showArtwork: _controller.state == ViewfinderState.unavailable,
+      child: held != null
+          // A picked photo gets the same held, blurred treatment as a shot.
+          ? _HeldFrame(key: ValueKey(held.path), file: held)
+          : camera != null && _controller.isLive
+              ? _Feed(key: ValueKey(camera), controller: camera)
+              : _StandIn(
+                  glyph: widget.standInGlyph,
+                  showArtwork:
+                      _controller.state == ViewfinderState.unavailable,
+                ),
+    );
+  }
+}
+
+/// The blur and darkening a held frame gets, easing in on first build and
+/// back out when [held] turns false.
+class _HeldBlur extends StatelessWidget {
+  const _HeldBlur({required this.held, required this.child});
+
+  static const double sigma = 14;
+
+  final bool held;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(end: held ? 1 : 0),
+      duration: const Duration(milliseconds: 360),
+      curve: Curves.easeOutCubic,
+      builder: (context, t, child) {
+        if (t == 0) return child!;
+        return ImageFiltered(
+          imageFilter: ImageFilter.blur(sigmaX: sigma * t, sigmaY: sigma * t),
+          child: ColorFiltered(
+            // A touch darker as well, so the copy over it sits on a calmer
+            // ground.
+            colorFilter: ColorFilter.mode(
+              Colors.black.withValues(alpha: 0.22 * t),
+              BlendMode.srcOver,
             ),
+            child: child,
+          ),
+        );
+      },
+      child: child,
+    );
+  }
+}
+
+/// A picked photo standing in for the feed while it is worked on.
+class _HeldFrame extends StatelessWidget {
+  const _HeldFrame({super.key, required this.file});
+
+  final File file;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const ColoredBox(color: AppColors.scanDark),
+        _HeldBlur(
+          held: true,
+          child: Image.file(
+            file,
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+          ),
+        ),
+        const _Scrims(),
+      ],
+    );
+  }
+}
+
+/// Keeps the header, copy and controls legible over any scene.
+class _Scrims extends StatelessWidget {
+  const _Scrims();
+
+  @override
+  Widget build(BuildContext context) {
+    return const DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          stops: [0, 0.2, 0.5, 0.72, 1],
+          colors: [
+            Color(0x8C000000),
+            Color(0x00000000),
+            Color(0x00060E08),
+            Color(0xB3060E08),
+            Color(0xF2060E08),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -314,8 +465,6 @@ class _Feed extends StatelessWidget {
 
   final CameraController controller;
 
-  static const double _heldBlur = 14;
-
   @override
   Widget build(BuildContext context) {
     // Reported landscape; the screens are portrait-locked, so swap the sides.
@@ -327,34 +476,10 @@ class _Feed extends StatelessWidget {
         if (size != null)
           ValueListenableBuilder<CameraValue>(
             valueListenable: controller,
-            builder: (context, value, preview) {
-              // Eases in as the frame is held and back out when the preview
-              // resumes, instead of snapping.
-              return TweenAnimationBuilder<double>(
-                tween: Tween<double>(end: value.isPreviewPaused ? 1 : 0),
-                duration: const Duration(milliseconds: 360),
-                curve: Curves.easeOutCubic,
-                builder: (context, t, child) {
-                  if (t == 0) return child!;
-                  return ImageFiltered(
-                    imageFilter: ImageFilter.blur(
-                      sigmaX: _heldBlur * t,
-                      sigmaY: _heldBlur * t,
-                    ),
-                    child: ColorFiltered(
-                      // A touch darker as well, so the copy over it sits on
-                      // a calmer ground.
-                      colorFilter: ColorFilter.mode(
-                        Colors.black.withValues(alpha: 0.22 * t),
-                        BlendMode.srcOver,
-                      ),
-                      child: child,
-                    ),
-                  );
-                },
-                child: preview,
-              );
-            },
+            // Eases in as the frame is held and back out when the preview
+            // resumes, instead of snapping.
+            builder: (context, value, preview) =>
+                _HeldBlur(held: value.isPreviewPaused, child: preview!),
             child: ClipRect(
               child: FittedBox(
                 fit: BoxFit.cover,
@@ -366,23 +491,7 @@ class _Feed extends StatelessWidget {
               ),
             ),
           ),
-        // Scrims keep the header, copy and controls legible over any scene.
-        const DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              stops: [0, 0.2, 0.5, 0.72, 1],
-              colors: [
-                Color(0x8C000000),
-                Color(0x00000000),
-                Color(0x00060E08),
-                Color(0xB3060E08),
-                Color(0xF2060E08),
-              ],
-            ),
-          ),
-        ),
+        const _Scrims(),
       ],
     );
   }

@@ -11,19 +11,24 @@ import 'token_store.dart';
 ///
 /// Override per build with
 /// `--dart-define=API_BASE_URL=https://api.florensic.example`. Phones and
-/// emulators — Android or iOS — reach the test server through its ngrok
-/// tunnel: `localhost` on a device is the device itself. Web and desktop run
-/// on the same machine as the local stack, so they keep `localhost`.
+/// emulators — Android or iOS — use the test server (plain HTTP until it has
+/// a certificate; the debug manifest and Info.plist allow that): `localhost`
+/// on a device is the device itself. Web and desktop run on the same machine
+/// as the local stack, so they keep `localhost`.
 String get serverUrl {
   const override = String.fromEnvironment('API_BASE_URL');
   if (override.isNotEmpty) return override;
   if (!kIsWeb &&
       (defaultTargetPlatform == TargetPlatform.android ||
           defaultTargetPlatform == TargetPlatform.iOS)) {
-    return 'https://uncompliable-willie-purply.ngrok-free.dev';
+    return testServerUrl;
   }
   return 'http://localhost:8010';
 }
+
+/// The shared test server (hand-off of 2026-10-07). Replaces the ngrok
+/// tunnel; images load from it without any tunnel.
+const String testServerUrl = 'http://13.202.212.73:8012';
 
 /// Every route sits under this prefix.
 const String apiVersion = '/v1';
@@ -66,10 +71,7 @@ class HttpClient {
         connectTimeout: const Duration(seconds: 100),
         receiveTimeout: const Duration(seconds: 200),
         receiveDataWhenStatusError: true,
-        headers: const {
-          'Accept': 'application/json',
-          'ngrok-skip-browser-warning': '1',
-        },
+        headers: const {'Accept': 'application/json'},
       ),
     );
     final client = HttpClient(authService: dio, tokens: tokens);

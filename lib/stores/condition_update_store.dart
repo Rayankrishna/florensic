@@ -159,14 +159,22 @@ abstract class _ConditionUpdateStore with Store {
       runInAction(() {
         errorMessage = e.toString();
         needsSettings = true;
+        photo = null;
       });
     } on ApiException catch (e) {
       AppLog.e('uploading the check-in photo failed',
           name: 'checkin', error: e);
-      runInAction(() => errorMessage = e.message);
+      // Not kept: nothing stays held on the viewfinder.
+      runInAction(() {
+        errorMessage = e.message;
+        photo = null;
+      });
     } catch (e, stack) {
       AppLog.e('capture failed', name: 'checkin', error: e, stackTrace: stack);
-      runInAction(() => errorMessage = e.toString());
+      runInAction(() {
+        errorMessage = e.toString();
+        photo = null;
+      });
     } finally {
       runInAction(() => isCapturing = false);
     }
@@ -187,12 +195,18 @@ abstract class _ConditionUpdateStore with Store {
     } on ApiException catch (e) {
       AppLog.e('uploading the check-in photo failed',
           name: 'checkin', error: e);
-      runInAction(() => errorMessage = e.message);
+      runInAction(() {
+        errorMessage = e.message;
+        photo = null;
+      });
       return false;
     } catch (e, stack) {
       AppLog.e('keeping the frame failed',
           name: 'checkin', error: e, stackTrace: stack);
-      runInAction(() => errorMessage = e.toString());
+      runInAction(() {
+        errorMessage = e.toString();
+        photo = null;
+      });
       return false;
     } finally {
       runInAction(() => isCapturing = false);
@@ -200,11 +214,14 @@ abstract class _ConditionUpdateStore with Store {
   }
 
   /// Keeps a capture, uploads it, and moves on to the review step.
-  Future<void> _accept(Capture taken) async {
+  Future<void> _accept(Capture picked) async {
+    // On screen at once — held and blurred — while the location follows.
     runInAction(() {
-      photo = taken;
-      capturedAt = taken.capturedAt;
+      photo = picked;
+      capturedAt = picked.capturedAt;
     });
+    final taken = await _capture.located(picked);
+    runInAction(() => photo = taken);
     await _uploadIfRemote(taken);
     runInAction(() {
       hasPhoto = true;
@@ -314,9 +331,11 @@ abstract class _ConditionUpdateStore with Store {
       modelVerdict = update?.modelVerdict;
       verdictDisagreement = update?.verdictDisagreement ?? false;
       nextCheckIn = result.nextCheckIn ?? updated.schedule.checkInWindowOpens;
-      _collection.completeTask('task-cond-${p.id}');
       isSaving = false;
     });
+    // The check-in is what answers today's condition task; the list just
+    // needs to catch up with the server.
+    await _collection.refreshTodaysCare();
     return true;
   }
 

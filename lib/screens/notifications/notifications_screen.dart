@@ -14,6 +14,7 @@ import '../../shared/components/headers.dart';
 import '../../shared/components/list_rows.dart';
 import '../../shared/components/metric_card.dart';
 import '../../shared/widgets/pg_icon.dart';
+import '../../shared/widgets/auth_image.dart';
 import '../../shared/widgets/plant_artwork.dart';
 import '../../shared/widgets/skeleton.dart';
 import '../../stores/notifications_store.dart';
@@ -273,10 +274,13 @@ class _NotificationRow extends StatelessWidget {
               child: SizedBox(
                 width: 56,
                 height: 56,
-                child: PlantArtwork(
-                  glyph: plant.species.glyph,
-                  ground: plant.species.ground,
-                  inset: 0.2,
+                child: PhotoOrArtwork(
+                  url: plant.coverPhoto?.thumb,
+                  artwork: PlantArtwork(
+                    glyph: plant.species.glyph,
+                    ground: plant.species.ground,
+                    inset: 0.2,
+                  ),
                 ),
               ),
             ),

@@ -2,6 +2,7 @@ import '../../../enum.dart';
 import '../../../interceptors/api_interceptor.dart';
 import '../../models/care_task.dart';
 import '../../models/plant.dart';
+import '../../models/plant_photo.dart';
 import '../../models/plant_species.dart';
 import '../../models/treatment.dart';
 import '../../provider/photos.provider.dart';
@@ -55,6 +56,10 @@ class RemotePlantRepository implements PlantRepository {
 
   @override
   Future<Plant> resumeActiveCare(String plantId) => _plants.resume(plantId);
+
+  @override
+  Future<List<PlantPhoto>> loadPhotos(String plantId) =>
+      _photos.forPlant(plantId);
 
   @override
   Future<List<Treatment>> loadTreatments(String plantId) =>

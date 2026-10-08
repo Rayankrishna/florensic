@@ -16,6 +16,7 @@ import '../../shared/components/pressable.dart';
 import '../../shared/services/capture_service.dart';
 import '../../shared/widgets/live_viewfinder.dart';
 import '../../shared/widgets/pg_icon.dart';
+import '../../shared/widgets/auth_image.dart';
 import '../../shared/widgets/plant_artwork.dart';
 import '../../stores/condition_update_store.dart';
 import '../../theme.dart';
@@ -148,11 +149,20 @@ class _CaptureStepState extends State<_CaptureStep> {
     return Observer(
       builder: (context) {
         final busy = _store.isCapturing;
+        // A photo picked from the library is held and blurred while it
+        // uploads, just as a shot is, and stays held once it is kept so the
+        // frame does not flicker back to live during the step change. If
+        // the upload fails, nothing is held and the preview runs again.
+        final picked = _store.photo;
+        final holdPicked = picked != null &&
+            picked.source == 'gallery' &&
+            (busy || _store.hasPhoto);
         return Stack(
           fit: StackFit.expand,
           children: [
             LiveViewfinder(
               controller: _viewfinder,
+              heldFile: holdPicked ? picked.file : null,
               standInGlyph: plant.species.glyph,
             ),
             if (busy) const ViewfinderSweep(),
@@ -660,10 +670,13 @@ class _DetailsStep extends StatelessWidget {
                         child: SizedBox(
                           width: 84,
                           height: 84,
-                          child: PlantArtwork(
-                            glyph: plant.species.glyph,
-                            ground: plant.species.ground,
-                            inset: 0.18,
+                          child: PhotoOrArtwork(
+                            url: plant.coverPhoto?.thumb,
+                            artwork: PlantArtwork(
+                              glyph: plant.species.glyph,
+                              ground: plant.species.ground,
+                              inset: 0.18,
+                            ),
                           ),
                         ),
                       ),

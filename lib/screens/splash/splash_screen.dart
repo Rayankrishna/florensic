@@ -51,6 +51,9 @@ class _SplashScreenState extends State<SplashScreen>
     final auth = locator<AuthStore>();
     final onboarding = locator<OnboardingStore>()..restore();
     final permissions = locator<PermissionsStore>()..restore();
+    // What the OS allows is read fresh every launch; the flag above only
+    // says whether the step has been seen.
+    unawaited(permissions.refresh());
     await auth.restoreSession();
     if (!mounted) return;
     _handoff = Timer(const Duration(milliseconds: 1500), () {

@@ -12,6 +12,7 @@ import '../../shared/components/app_toast.dart';
 import '../../shared/components/headers.dart';
 import '../../shared/components/pressable.dart';
 import '../../shared/widgets/pg_icon.dart';
+import '../../shared/widgets/auth_image.dart';
 import '../../shared/widgets/plant_artwork.dart';
 import '../../stores/pokedex_store.dart';
 import '../../stores/scanning_store.dart';
@@ -59,12 +60,30 @@ class ScanResultScreen extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            PlantArtwork(
-                              glyph: species.glyph,
-                              showGround: false,
-                              tint: const Color(0xFF050D05),
-                              inset: 0.04,
+                            PhotoOrArtwork(
+                              url: species.imageUrl,
+                              artwork: PlantArtwork(
+                                glyph: species.glyph,
+                                showGround: false,
+                                tint: const Color(0xFF050D05),
+                                inset: 0.04,
+                              ),
                             ),
+                            if (species.imageUrl != null)
+                              const DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    stops: [0, 0.45, 1],
+                                    colors: [
+                                      Color(0x8C000000),
+                                      Color(0x1A000000),
+                                      Color(0x99061A0B),
+                                    ],
+                                  ),
+                                ),
+                              ),
                             Positioned(
                               top: 0,
                               left: 0,
@@ -379,10 +398,13 @@ class _Alternatives extends StatelessWidget {
                   children: [
                     SizedBox(
                       height: 92,
-                      child: PlantArtwork(
-                        glyph: alt.species.glyph,
-                        ground: alt.species.ground,
-                        inset: 0.16,
+                      child: PhotoOrArtwork(
+                        url: alt.species.imageUrl,
+                        artwork: PlantArtwork(
+                          glyph: alt.species.glyph,
+                          ground: alt.species.ground,
+                          inset: 0.16,
+                        ),
                       ),
                     ),
                     Padding(

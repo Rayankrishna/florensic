@@ -32,6 +32,13 @@
 	<string>Florensic can identify a plant from a photo you already took.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Florensic uses your location for weather-aware care insights and to note where a photo was taken.</string>
+	<!-- The test server is plain HTTP until it has a certificate. Remove this
+	     exception once the API is on HTTPS. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'domain/models/plant.dart';
 import 'domain/models/plant_species.dart';
+import 'locator.dart';
 import 'screens/auth/auth_landing_screen.dart';
 import 'screens/auth/sign_in_screen.dart';
 import 'screens/auth/sign_up_screen.dart';
@@ -22,6 +23,7 @@ import 'screens/scanning/scan_screen.dart';
 import 'screens/shell/app_shell.dart';
 import 'screens/splash/splash_screen.dart';
 import 'stores/condition_update_store.dart';
+import 'stores/permissions_store.dart';
 import 'stores/plant_detail_store.dart';
 import 'theme.dart';
 import 'utils/page_transitions.dart';
@@ -52,6 +54,12 @@ class AppRoutes {
   static const String scanResult = '/scan/result';
   static const String notifications = '/notifications';
   static const String insights = '/insights';
+
+  /// Where a keeper who already has an account lands after signing in: the
+  /// permissions step if this device has not done it yet, else home. The
+  /// introduction is only for a newly created account.
+  static String get afterSignIn =>
+      locator<PermissionsStore>().completed ? shell : permissions;
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     final args = settings.arguments;

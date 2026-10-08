@@ -23,22 +23,36 @@ mixin _$PermissionsStore on _PermissionsStore, Store {
     () => super.hasCamera,
     name: '_PermissionsStore.hasCamera',
   )).value;
+  Computed<bool>? _$allGrantedComputed;
 
-  late final _$grantedAtom = Atom(
-    name: '_PermissionsStore.granted',
+  @override
+  bool get allGranted => (_$allGrantedComputed ??= Computed<bool>(
+    () => super.allGranted,
+    name: '_PermissionsStore.allGranted',
+  )).value;
+  Computed<bool>? _$anyAskableComputed;
+
+  @override
+  bool get anyAskable => (_$anyAskableComputed ??= Computed<bool>(
+    () => super.anyAskable,
+    name: '_PermissionsStore.anyAskable',
+  )).value;
+
+  late final _$statesAtom = Atom(
+    name: '_PermissionsStore.states',
     context: context,
   );
 
   @override
-  ObservableMap<PermissionKind, bool> get granted {
-    _$grantedAtom.reportRead();
-    return super.granted;
+  ObservableMap<PermissionKind, PermissionState> get states {
+    _$statesAtom.reportRead();
+    return super.states;
   }
 
   @override
-  set granted(ObservableMap<PermissionKind, bool> value) {
-    _$grantedAtom.reportWrite(value, super.granted, () {
-      super.granted = value;
+  set states(ObservableMap<PermissionKind, PermissionState> value) {
+    _$statesAtom.reportWrite(value, super.states, () {
+      super.states = value;
     });
   }
 
@@ -60,6 +74,54 @@ mixin _$PermissionsStore on _PermissionsStore, Store {
     });
   }
 
+  late final _$requestingAtom = Atom(
+    name: '_PermissionsStore.requesting',
+    context: context,
+  );
+
+  @override
+  PermissionKind? get requesting {
+    _$requestingAtom.reportRead();
+    return super.requesting;
+  }
+
+  @override
+  set requesting(PermissionKind? value) {
+    _$requestingAtom.reportWrite(value, super.requesting, () {
+      super.requesting = value;
+    });
+  }
+
+  late final _$refreshAsyncAction = AsyncAction(
+    '_PermissionsStore.refresh',
+    context: context,
+  );
+
+  @override
+  Future<void> refresh() {
+    return _$refreshAsyncAction.run(() => super.refresh());
+  }
+
+  late final _$requestAsyncAction = AsyncAction(
+    '_PermissionsStore.request',
+    context: context,
+  );
+
+  @override
+  Future<PermissionState> request(PermissionKind kind) {
+    return _$requestAsyncAction.run(() => super.request(kind));
+  }
+
+  late final _$requestAllAsyncAction = AsyncAction(
+    '_PermissionsStore.requestAll',
+    context: context,
+  );
+
+  @override
+  Future<void> requestAll() {
+    return _$requestAllAsyncAction.run(() => super.requestAll());
+  }
+
   late final _$completeAsyncAction = AsyncAction(
     '_PermissionsStore.complete',
     context: context,
@@ -76,24 +138,12 @@ mixin _$PermissionsStore on _PermissionsStore, Store {
   );
 
   @override
-  void toggle(PermissionKind kind) {
+  Future<bool> openSettings() {
     final _$actionInfo = _$_PermissionsStoreActionController.startAction(
-      name: '_PermissionsStore.toggle',
+      name: '_PermissionsStore.openSettings',
     );
     try {
-      return super.toggle(kind);
-    } finally {
-      _$_PermissionsStoreActionController.endAction(_$actionInfo);
-    }
-  }
-
-  @override
-  void set(PermissionKind kind, bool value) {
-    final _$actionInfo = _$_PermissionsStoreActionController.startAction(
-      name: '_PermissionsStore.set',
-    );
-    try {
-      return super.set(kind, value);
+      return super.openSettings();
     } finally {
       _$_PermissionsStoreActionController.endAction(_$actionInfo);
     }
@@ -114,10 +164,13 @@ mixin _$PermissionsStore on _PermissionsStore, Store {
   @override
   String toString() {
     return '''
-granted: ${granted},
+states: ${states},
 completed: ${completed},
+requesting: ${requesting},
 hasPhotoLibrary: ${hasPhotoLibrary},
-hasCamera: ${hasCamera}
+hasCamera: ${hasCamera},
+allGranted: ${allGranted},
+anyAskable: ${anyAskable}
     ''';
   }
 }

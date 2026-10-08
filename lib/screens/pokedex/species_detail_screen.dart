@@ -14,6 +14,7 @@ import '../../shared/components/app_toast.dart';
 import '../../shared/components/headers.dart';
 import '../../shared/components/list_rows.dart';
 import '../../shared/widgets/pg_icon.dart';
+import '../../shared/widgets/auth_image.dart';
 import '../../shared/widgets/plant_artwork.dart';
 import '../../stores/plant_collection_store.dart';
 import '../../theme.dart';
@@ -72,10 +73,13 @@ class _SpeciesDetailScreenState extends State<SpeciesDetailScreen> {
                       children: [
                         Hero(
                           tag: AppKeys.speciesHero(s.id),
-                          child: PlantArtwork(
-                            glyph: s.glyph,
-                            ground: s.ground,
-                            inset: 0.05,
+                          child: PhotoOrArtwork(
+                            url: s.imageUrl,
+                            artwork: PlantArtwork(
+                              glyph: s.glyph,
+                              ground: s.ground,
+                              inset: 0.05,
+                            ),
                           ),
                         ),
                         const Positioned(

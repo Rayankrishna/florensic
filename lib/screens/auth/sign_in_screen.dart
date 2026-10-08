@@ -9,6 +9,7 @@ import '../../shared/components/app_surfaces.dart';
 import '../../shared/components/app_text_field.dart';
 import '../../shared/widgets/pg_icon.dart';
 import '../../stores/auth_store.dart';
+import '../../stores/onboarding_store.dart';
 import '../../theme.dart';
 
 /// `Welcome back.`
@@ -58,9 +59,14 @@ class _SignInScreenState extends State<SignInScreen> {
     if (!mounted) return;
 
     if (ok) {
+      // An existing account has no introduction to sit through. Mark it
+      // seen so the next launch does not show it either, then land on the
+      // permissions step if this device still needs it, else home.
+      await locator<OnboardingStore>().completeOnboarding();
+      if (!mounted) return;
       Navigator.of(
         context,
-      ).pushNamedAndRemoveUntil(AppRoutes.onboarding, (route) => false);
+      ).pushNamedAndRemoveUntil(AppRoutes.afterSignIn, (route) => false);
       return;
     }
     // 403 email_unverified: the store has already sent a fresh code, so carry

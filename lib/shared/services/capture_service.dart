@@ -28,6 +28,15 @@ class Capture {
   final double? accuracyM;
 
   String get path => file.path;
+
+  Capture copyWith({double? lat, double? lon, double? accuracyM}) => Capture(
+        file: file,
+        source: source,
+        capturedAt: capturedAt,
+        lat: lat ?? this.lat,
+        lon: lon ?? this.lon,
+        accuracyM: accuracyM ?? this.accuracyM,
+      );
 }
 
 /// Raised when the keeper has permanently refused a permission, so the app
@@ -72,11 +81,11 @@ class CaptureService {
   static const double _maxEdge = 2048;
   static const int _quality = 88;
 
-  Future<Capture?> takePhoto({bool withLocation = true}) =>
-      _pick(ImageSource.camera, withLocation: withLocation);
+  /// Returns as soon as the picker closes, without a location, so the
+  /// screen can show the photo at once; [located] adds the position after.
+  Future<Capture?> takePhoto() => _pick(ImageSource.camera);
 
-  Future<Capture?> pickFromGallery({bool withLocation = true}) =>
-      _pick(ImageSource.gallery, withLocation: withLocation);
+  Future<Capture?> pickFromGallery() => _pick(ImageSource.gallery);
 
   /// Camera access for the in-app viewfinder. With [prompt] false it only
   /// reads the current state, so coming back from Settings never re-opens
@@ -92,26 +101,25 @@ class CaptureService {
     return CameraAccess.denied;
   }
 
-  /// Wraps a frame the in-app viewfinder took, located like a picked photo.
-  Future<Capture> fromViewfinder(
-    File file, {
-    bool withLocation = true,
-  }) async {
-    final position = withLocation ? await _tryLocation() : null;
-    return Capture(
-      file: file,
-      source: 'camera',
-      capturedAt: AppClock.now(),
-      lat: position?.latitude,
-      lon: position?.longitude,
-      accuracyM: position?.accuracy,
+  /// Wraps a frame the in-app viewfinder took. No location yet; [located]
+  /// adds it before the upload.
+  Future<Capture> fromViewfinder(File file) async =>
+      Capture(file: file, source: 'camera', capturedAt: AppClock.now());
+
+  /// The same capture with where it was taken, when the keeper allows that.
+  /// Location is a nicety, never a blocker: weather-aware care is better
+  /// with it, and the upload still succeeds without it.
+  Future<Capture> located(Capture taken) async {
+    final position = await _tryLocation();
+    if (position == null) return taken;
+    return taken.copyWith(
+      lat: position.latitude,
+      lon: position.longitude,
+      accuracyM: position.accuracy,
     );
   }
 
-  Future<Capture?> _pick(
-    ImageSource source, {
-    required bool withLocation,
-  }) async {
+  Future<Capture?> _pick(ImageSource source) async {
     await _ensureMediaPermission(source);
 
     final picked = await _picker.pickImage(
@@ -123,14 +131,10 @@ class CaptureService {
     );
     if (picked == null) return null; // The keeper backed out.
 
-    final position = withLocation ? await _tryLocation() : null;
     return Capture(
       file: File(picked.path),
       source: source == ImageSource.camera ? 'camera' : 'gallery',
       capturedAt: AppClock.now(),
-      lat: position?.latitude,
-      lon: position?.longitude,
-      accuracyM: position?.accuracy,
     );
   }
 
@@ -157,8 +161,6 @@ class CaptureService {
     }
   }
 
-  /// Location is a nicety, never a blocker: weather-aware care is better with
-  /// it, and the upload still succeeds without it.
   Future<Position?> _tryLocation() async {
     try {
       if (!await Geolocator.isLocationServiceEnabled()) return null;
@@ -193,22 +195,20 @@ class StubCaptureService extends CaptureService {
   StubCaptureService();
 
   @override
-  Future<Capture?> takePhoto({bool withLocation = true}) async =>
-      _fake('camera');
+  Future<Capture?> takePhoto() async => _fake('camera');
 
   @override
-  Future<Capture?> pickFromGallery({bool withLocation = true}) async =>
-      _fake('gallery');
+  Future<Capture?> pickFromGallery() async => _fake('gallery');
+
+  @override
+  Future<Capture> located(Capture taken) async => taken;
 
   @override
   Future<CameraAccess> cameraAccess({bool prompt = true}) async =>
       CameraAccess.granted;
 
   @override
-  Future<Capture> fromViewfinder(
-    File file, {
-    bool withLocation = true,
-  }) async =>
+  Future<Capture> fromViewfinder(File file) async =>
       Capture(file: file, source: 'camera', capturedAt: AppClock.now());
 
   /// Returns immediately: the real shutter has its own latency, and an

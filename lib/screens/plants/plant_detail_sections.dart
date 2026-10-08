@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../domain/models/plant.dart';
 import '../../domain/models/plant_health.dart';
+import '../../domain/models/plant_photo.dart';
 import '../../domain/models/treatment.dart';
 import '../../enum.dart';
+import '../../key.dart';
 import '../../locator.dart';
 import '../../shared/components/app_button.dart';
 import '../../shared/components/app_chip.dart';
@@ -12,6 +14,7 @@ import '../../shared/components/app_text_field.dart';
 import '../../shared/components/headers.dart';
 import '../../shared/components/list_rows.dart';
 import '../../shared/components/pressable.dart';
+import '../../shared/widgets/auth_image.dart';
 import '../../shared/widgets/health_ring.dart';
 import '../../shared/widgets/pg_icon.dart';
 import '../../shared/widgets/plant_artwork.dart';
@@ -19,6 +22,62 @@ import '../../stores/plant_collection_store.dart';
 import '../../stores/plant_detail_store.dart';
 import '../../theme.dart';
 import '../../utils/date_format.dart';
+
+/// The plant's newest photo, first thing on the page: the `working` size
+/// for a detail view, the drawn artwork for a plant kept without a photo.
+/// Shares the collection card's hero so the thumbnail grows into place.
+class PlantPhotoCard extends StatelessWidget {
+  const PlantPhotoCard({super.key, required this.plant});
+
+  final Plant plant;
+
+  @override
+  Widget build(BuildContext context) {
+    final cover = plant.coverPhoto;
+    return Hero(
+      tag: AppKeys.plantHero(plant.id),
+      child: ClipRRect(
+        borderRadius: AppRadius.cardR,
+        child: AspectRatio(
+          aspectRatio: 4 / 3,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              PhotoOrArtwork(
+                url: cover?.working,
+                artwork: PlantArtwork(
+                  glyph: plant.species.glyph,
+                  ground: plant.species.ground,
+                  inset: 0.08,
+                ),
+              ),
+              if (cover?.capturedAt != null)
+                Positioned(
+                  left: AppSpacing.md,
+                  bottom: AppSpacing.md,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.45),
+                      borderRadius: AppRadius.pillR,
+                    ),
+                    child: Text(
+                      'Taken ${AppDate.dayMonth(cover!.capturedAt!)}',
+                      style: AppText.label13.copyWith(
+                        fontSize: 12.5,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 /// The full score card, shown while a plant is thriving.
 class FullHealthCard extends StatelessWidget {
@@ -581,24 +640,35 @@ class UnavailableTrendCard extends StatelessWidget {
 }
 
 /// The horizontal strip of past condition photos, with a `+n` overflow tile.
+///
+/// Real photos when the gallery has loaded any; the drawn artwork stands in
+/// before that and for a plant kept without a photo.
 class ConditionHistoryStrip extends StatelessWidget {
-  const ConditionHistoryStrip({super.key, required this.plant});
+  const ConditionHistoryStrip({
+    super.key,
+    required this.plant,
+    this.photos = const [],
+  });
 
   final Plant plant;
+
+  /// Newest first.
+  final List<PlantPhoto> photos;
 
   @override
   Widget build(BuildContext context) {
     const visible = 3;
-    final overflow = plant.photoCount - visible;
+    final shown = photos.isEmpty ? visible : photos.length.clamp(0, visible);
+    final overflow = plant.photoCount - shown;
     return SizedBox(
       height: 104,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
-        itemCount: visible + (overflow > 0 ? 1 : 0),
+        itemCount: shown + (overflow > 0 ? 1 : 0),
         separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.md),
         itemBuilder: (context, index) {
-          if (index == visible) {
+          if (index == shown) {
             return Container(
               width: 104,
               alignment: Alignment.center,
@@ -611,19 +681,22 @@ class ConditionHistoryStrip extends StatelessWidget {
                   style: AppText.heading20.copyWith(fontSize: 18.5)),
             );
           }
+          final artwork = PlantArtwork(
+            glyph: plant.species.glyph,
+            ground: index.isEven
+                ? plant.species.ground
+                : (plant.species.ground == GroundPalette.mint
+                    ? GroundPalette.sage
+                    : GroundPalette.mint),
+            inset: 0.14,
+          );
           return ClipRRect(
             borderRadius: BorderRadius.circular(AppRadius.tile),
             child: SizedBox(
               width: 104,
-              child: PlantArtwork(
-                glyph: plant.species.glyph,
-                ground: index.isEven
-                    ? plant.species.ground
-                    : (plant.species.ground == GroundPalette.mint
-                        ? GroundPalette.sage
-                        : GroundPalette.mint),
-                inset: 0.14,
-              ),
+              child: index < photos.length
+                  ? AuthImage(url: photos[index].urls.thumb, fallback: artwork)
+                  : artwork,
             ),
           );
         },
@@ -756,11 +829,20 @@ class _RemovePlantSheetState extends State<_RemovePlantSheet> {
                     child: SizedBox(
                       width: 72,
                       height: 72,
-                      child: PlantArtwork(
-                        glyph: plant.species.glyph,
-                        ground: plant.species.ground,
-                        inset: 0.16,
-                      ),
+                      child: plant.coverPhoto == null
+                          ? PlantArtwork(
+                              glyph: plant.species.glyph,
+                              ground: plant.species.ground,
+                              inset: 0.16,
+                            )
+                          : AuthImage(
+                              url: plant.coverPhoto!.thumb,
+                              fallback: PlantArtwork(
+                                glyph: plant.species.glyph,
+                                ground: plant.species.ground,
+                                inset: 0.16,
+                              ),
+                            ),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.lg),

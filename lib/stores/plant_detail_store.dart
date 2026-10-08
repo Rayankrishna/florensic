@@ -2,6 +2,7 @@ import 'package:mobx/mobx.dart';
 
 import '../domain/models/plant.dart';
 import '../domain/models/plant_health.dart';
+import '../domain/models/plant_photo.dart';
 import '../domain/models/treatment.dart';
 import '../domain/repositories/plant_repository.dart';
 import '../enum.dart';
@@ -90,6 +91,13 @@ abstract class _PlantDetailStore with Store {
 
   @observable
   bool coursesLoaded = false;
+
+  /// The plant's photos, newest first, for the condition history strip.
+  @observable
+  ObservableList<PlantPhoto> photos = ObservableList<PlantPhoto>();
+
+  @observable
+  bool photosLoaded = false;
 
   /// The plan in progress, if any.
   @computed
@@ -439,6 +447,25 @@ abstract class _PlantDetailStore with Store {
     state = LoadState.ready;
     courses.clear();
     coursesLoaded = false;
+    photos.clear();
+    photosLoaded = false;
+  }
+
+  @action
+  Future<void> loadPhotos() async {
+    final p = plant;
+    if (p == null) return;
+    try {
+      final list = await _repository.loadPhotos(p.id);
+      runInAction(() {
+        photos = ObservableList<PlantPhoto>.of(list);
+        photosLoaded = true;
+      });
+    } catch (e, stack) {
+      AppLog.e('loading photos failed',
+          name: 'plants', error: e, stackTrace: stack);
+      runInAction(() => photosLoaded = true);
+    }
   }
 
   @action
@@ -599,6 +626,8 @@ abstract class _PlantDetailStore with Store {
     plant = updated;
     _collection.replacePlant(updated);
     loadCourses();
+    // The check-in added a photo.
+    loadPhotos();
   }
 
   static DateTime _stripTime(DateTime d) => DateTime(d.year, d.month, d.day);

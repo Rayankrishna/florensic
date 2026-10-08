@@ -6,6 +6,7 @@ import '../../routes.dart';
 import '../../shared/components/app_button.dart';
 import '../../shared/components/pressable.dart';
 import '../../shared/widgets/pg_icon.dart';
+import '../../shared/widgets/auth_image.dart';
 import '../../shared/widgets/plant_artwork.dart';
 import '../../theme.dart';
 
@@ -61,7 +62,16 @@ class HomeAttentionCard extends StatelessWidget {
               child: SizedBox(
                 width: 56,
                 height: 56,
-                child: onLeaf
+                child: plant.coverPhoto != null
+                    ? AuthImage(
+                        url: plant.coverPhoto!.thumb,
+                        fallback: PlantArtwork(
+                          glyph: plant.species.glyph,
+                          ground: plant.species.ground,
+                          inset: 0.14,
+                        ),
+                      )
+                    : onLeaf
                     ? ColoredBox(
                         color: Colors.white.withValues(alpha: 0.30),
                         child: PlantArtwork(

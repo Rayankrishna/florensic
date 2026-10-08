@@ -33,6 +33,7 @@ class Plant {
     this.needsAttentionFlag,
     this.careScore,
     this.risk,
+    this.coverPhoto,
   });
 
   factory Plant.fromJson(Map<String, dynamic> json) {
@@ -72,6 +73,7 @@ class Plant {
           : null,
       careScore: Json.intOrNull(json['care_score']),
       risk: Risk.fromJson(json['risk']),
+      coverPhoto: CoverPhoto.fromJson(json['cover_photo']),
     );
   }
 
@@ -121,6 +123,9 @@ class Plant {
   /// Only the detail read and a finished check-in compute this; everywhere
   /// else it arrives as `null`, meaning "not computed here".
   final Risk? risk;
+
+  /// The newest photo, or null when the plant was kept without one.
+  final CoverPhoto? coverPhoto;
 
   String get latinName => species.latinName;
   HealthBand? get band => healthBand;
@@ -235,6 +240,7 @@ class Plant {
     bool? needsAttentionFlag,
     Risk? risk,
   }) {
+    // The cover photo is carried over as-is; a write never drops one.
     return Plant(
       id: id,
       species: species,
@@ -257,8 +263,41 @@ class Plant {
       needsAttentionFlag: needsAttentionFlag ?? this.needsAttentionFlag,
       careScore: careScore,
       risk: risk ?? this.risk,
+      coverPhoto: coverPhoto,
     );
   }
+}
+
+/// A plant's newest photo, as API routes rather than public files: the
+/// server streams the image only to its owner, so the request must carry the
+/// bearer token (see `AuthImage`). `thumb` for cards and grids, `working`
+/// for the detail screen. Never persisted: refetch the plant and use what it
+/// returns.
+class CoverPhoto {
+  const CoverPhoto({
+    required this.photoId,
+    required this.thumb,
+    required this.working,
+    this.capturedAt,
+  });
+
+  static CoverPhoto? fromJson(Object? value) {
+    if (value is! Map) return null;
+    final json = Json.map(value);
+    final thumb = Json.str(json['thumb']);
+    if (thumb.isEmpty) return null;
+    return CoverPhoto(
+      photoId: Json.str(json['photo_id']),
+      thumb: thumb,
+      working: Json.str(json['working'], thumb),
+      capturedAt: Json.dateOrNull(json['captured_at']),
+    );
+  }
+
+  final String photoId;
+  final String thumb;
+  final String working;
+  final DateTime? capturedAt;
 }
 
 /// Status text plus the tone it is painted in.

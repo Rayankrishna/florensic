@@ -90,7 +90,12 @@ class _ScanScreenState extends State<ScanScreen> {
         },
         photoLibraryEnabled: _store.photoLibraryEnabled,
       ),
-    ).whenComplete(_viewfinder.resumePreview);
+    ).whenComplete(() {
+      // Back at the viewfinder: drop the frame that was being identified,
+      // shot or picked, and let the preview run again.
+      _store.resetScan();
+      _viewfinder.resumePreview();
+    });
   }
 
   @override
@@ -102,10 +107,18 @@ class _ScanScreenState extends State<ScanScreen> {
         body: Observer(
           builder: (context) {
             final busy = _store.isScanning || _store.isCapturing;
+            // A photo picked from the library is held and blurred while it
+            // is identified, just as a shot is.
+            final picked = _store.capture;
             return Stack(
               fit: StackFit.expand,
               children: [
-                LiveViewfinder(controller: _viewfinder),
+                LiveViewfinder(
+                  controller: _viewfinder,
+                  heldFile: picked != null && picked.source == 'gallery'
+                      ? picked.file
+                      : null,
+                ),
                 if (busy) const ViewfinderSweep(),
                 SafeArea(
                   child: Column(

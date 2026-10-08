@@ -12,6 +12,7 @@ import '../../shared/components/app_text_field.dart';
 import '../../shared/components/app_toast.dart';
 import '../../shared/widgets/pg_icon.dart';
 import '../../stores/auth_store.dart';
+import '../../stores/onboarding_store.dart';
 import '../../theme.dart';
 
 /// `Check your inbox.` — six-digit verification, with the reset confirmation
@@ -101,11 +102,21 @@ class _VerifyCodeScreenState extends State<VerifyCodeScreen> {
     }
 
     final ok = await _store.verifyCode();
-    if (ok && mounted) {
+    if (!ok || !mounted) return;
+
+    // Only a brand-new account gets the introduction. A sign-in that needed
+    // a code (an address never verified) is still an existing account.
+    if (_store.otpPurpose == 'signup') {
       Navigator.of(
         context,
       ).pushNamedAndRemoveUntil(AppRoutes.onboarding, (route) => false);
+      return;
     }
+    await locator<OnboardingStore>().completeOnboarding();
+    if (!mounted) return;
+    Navigator.of(
+      context,
+    ).pushNamedAndRemoveUntil(AppRoutes.afterSignIn, (route) => false);
   }
 
   @override
