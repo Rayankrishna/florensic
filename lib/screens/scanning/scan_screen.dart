@@ -8,7 +8,6 @@ import '../../routes.dart';
 import '../../shared/components/app_button.dart';
 import '../../shared/components/app_chip.dart';
 import '../../shared/components/headers.dart';
-import '../../shared/components/pressable.dart';
 import '../../shared/services/capture_service.dart';
 import '../../shared/widgets/live_viewfinder.dart';
 import '../../shared/widgets/pg_icon.dart';
@@ -161,14 +160,16 @@ class _ScanScreenState extends State<ScanScreen> {
                         ),
                         child: Column(
                           children: [
-                            Text(
-                              busy ? 'Identifying…' : 'Point at a single leaf',
-                              style: AppText.heading20.copyWith(
-                                fontSize: 22.5,
-                                color: Colors.white,
+                            if (busy) ...[
+                              Text(
+                                'Identifying…',
+                                style: AppText.heading20.copyWith(
+                                  fontSize: 22.5,
+                                  color: Colors.white,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: AppSpacing.md),
+                              const SizedBox(height: AppSpacing.md),
+                            ],
                             Text(
                               'Fill the frame with one healthy leaf in even '
                               'light — that gives the cleanest match.',
@@ -177,21 +178,6 @@ class _ScanScreenState extends State<ScanScreen> {
                                 fontSize: 15,
                                 color: Colors.white.withValues(alpha: 0.72),
                               ),
-                            ),
-                            const SizedBox(height: AppSpacing.xl),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                for (final target in ScanTarget.values) ...[
-                                  if (target != ScanTarget.values.first)
-                                    const SizedBox(width: AppSpacing.md),
-                                  _TargetChip(
-                                    label: target.label,
-                                    selected: _store.target == target,
-                                    onTap: () => _store.setTarget(target),
-                                  ),
-                                ],
-                              ],
                             ),
                           ],
                         ),
@@ -236,49 +222,6 @@ class _ScanScreenState extends State<ScanScreen> {
               ],
             );
           },
-        ),
-      ),
-    );
-  }
-}
-
-class _TargetChip extends StatelessWidget {
-  const _TargetChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Pressable(
-      onTap: onTap,
-      scale: 0.95,
-      semanticLabel: label,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.xl,
-          vertical: 12,
-        ),
-        decoration: BoxDecoration(
-          color: selected
-              ? Colors.white.withValues(alpha: 0.22)
-              : Colors.white.withValues(alpha: 0.08),
-          borderRadius: AppRadius.pillR,
-        ),
-        child: Text(
-          label,
-          style: AppText.label13.copyWith(
-            fontSize: 14,
-            color: selected
-                ? Colors.white
-                : Colors.white.withValues(alpha: 0.66),
-          ),
         ),
       ),
     );

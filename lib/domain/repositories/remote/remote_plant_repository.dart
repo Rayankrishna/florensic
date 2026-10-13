@@ -26,10 +26,6 @@ class RemotePlantRepository implements PlantRepository {
   final PlantsProvider _plants;
   final PhotosProvider _photos;
 
-  /// Photo id from the identification, so a new plant keeps the photo that
-  /// found it along with its location and first care plan.
-  String? pendingPhotoId;
-
   /// Set by the check-in flow before [submitConditionUpdate].
   String? pendingCheckInPhotoId;
 
@@ -78,16 +74,17 @@ class RemotePlantRepository implements PlantRepository {
           {String? note}) =>
       _plants.abandonCourse(courseId, reason.wire, note: note);
 
+  /// With [photoId] the server keeps the identification photo as the
+  /// plant's cover and opens a treatment plan from its findings. On a sick
+  /// scan this can take a little while: the plan is drafted in the request.
   @override
-  Future<Plant> addPlant(PlantSpecies species, {String? nickname}) async {
-    final plant = await _plants.create(
-      speciesId: species.id,
-      photoId: pendingPhotoId,
-      nickname: nickname,
-    );
-    pendingPhotoId = null;
-    return plant;
-  }
+  Future<Plant> addPlant(PlantSpecies species,
+          {String? nickname, String? photoId}) =>
+      _plants.create(
+        speciesId: species.id,
+        photoId: photoId,
+        nickname: nickname,
+      );
 
   @override
   Future<void> removePlant(String plantId) =>
@@ -142,16 +139,22 @@ class RemotePlantRepository implements PlantRepository {
       );
     }
     final plant = job.checkinPlant;
-    if (plant != null) {
+    // The check-in photo becomes the cover; if the payload predates that,
+    // re-read the plant so screens don't keep the old (or no) picture.
+    if (plant != null && plant.coverPhoto?.photoId == photoId) {
       return CheckInResult(
         plant: plant,
         update: job.checkinUpdate,
         nextCheckIn: job.nextCheckIn,
       );
     }
-    // The check-in landed but the payload was thin — re-read the plant so the
-    // UI still shows the truth.
-    return CheckInResult(plant: await _plants.byId(plantId));
+    // The check-in landed but the payload was thin or stale — re-read the
+    // plant so the UI still shows the truth.
+    return CheckInResult(
+      plant: await _plants.byId(plantId),
+      update: job.checkinUpdate,
+      nextCheckIn: job.nextCheckIn,
+    );
   }
 
   static String _verdictName(ConditionVerdict verdict) => switch (verdict) {

@@ -230,7 +230,12 @@ abstract class _ScanningStore with Store {
     if (match == null || isAdding) return null;
     isAdding = true;
     try {
-      return await _collection.addPlant(match.species, nickname: nickname);
+      // The photo that found the plant becomes its first photo.
+      return await _collection.addPlant(
+        match.species,
+        nickname: nickname,
+        photoId: match.photoId,
+      );
     } finally {
       runInAction(() => isAdding = false);
     }

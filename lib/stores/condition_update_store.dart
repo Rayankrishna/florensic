@@ -92,8 +92,9 @@ abstract class _ConditionUpdateStore with Store {
   @computed
   bool get canContinueFromReview => hasPhoto;
 
+  /// The verdict is optional — a keeper can save on the photo alone.
   @computed
-  bool get canSave => verdict != null && !isSaving;
+  bool get canSave => !isSaving;
 
   @computed
   String get stepTitle => switch (step) {
@@ -288,8 +289,11 @@ abstract class _ConditionUpdateStore with Store {
   @action
   Future<bool> save() async {
     final p = plant;
-    final v = verdict;
-    if (p == null || v == null) return false;
+    if (p == null) return false;
+    // The API requires a verdict and only records it (it never moves the
+    // score), so a skipped one goes up as "nothing unusual".
+    final skipped = verdict == null;
+    final v = verdict ?? ConditionVerdict.healthy;
     isSaving = true;
     errorMessage = null;
 
@@ -329,7 +333,9 @@ abstract class _ConditionUpdateStore with Store {
       scoreDelta = update?.scoreDelta;
       provisional = update?.provisional ?? false;
       modelVerdict = update?.modelVerdict;
-      verdictDisagreement = update?.verdictDisagreement ?? false;
+      // A verdict the keeper never gave cannot disagree with the photo.
+      verdictDisagreement =
+          !skipped && (update?.verdictDisagreement ?? false);
       nextCheckIn = result.nextCheckIn ?? updated.schedule.checkInWindowOpens;
       isSaving = false;
     });

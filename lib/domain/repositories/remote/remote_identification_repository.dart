@@ -18,9 +18,6 @@ class RemoteIdentificationRepository implements IdentificationRepository {
   /// before calling [identify].
   Capture? pendingCapture;
 
-  /// Kept so `POST /v1/plants` can attach the photo that found the plant.
-  String? lastPhotoId;
-
   /// Populated on a no-match so the result sheet can still offer the
   /// runners-up and the manual search.
   List<AnalysisAlternative> lastAlternatives = const [];
@@ -48,8 +45,6 @@ class RemoteIdentificationRepository implements IdentificationRepository {
       locationAccuracyM: capture.accuracyM,
       capturedAt: capture.capturedAt,
     );
-    lastPhotoId = queued.photoId;
-
     final job = await _photos.awaitJob(queued.jobId);
     lastAlternatives = job.alternatives;
     lastInitialHealth = job.initialHealth;
@@ -68,6 +63,7 @@ class RemoteIdentificationRepository implements IdentificationRepository {
 
     return IdentificationResult(
       species: job.species!,
+      photoId: queued.photoId,
       confidence: job.confidence ?? 0,
       rationale: job.rationale?.isNotEmpty == true
           ? job.rationale!

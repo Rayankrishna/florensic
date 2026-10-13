@@ -52,7 +52,9 @@ abstract class PlantRepository {
 
   /// Adds [species] to the collection. [nickname] is what the keeper calls
   /// this particular plant; blank falls back to the species' common name.
-  Future<Plant> addPlant(PlantSpecies species, {String? nickname});
+  /// [photoId] is the identification photo, kept as the plant's first.
+  Future<Plant> addPlant(PlantSpecies species,
+      {String? nickname, String? photoId});
 
   Future<void> removePlant(String plantId);
 

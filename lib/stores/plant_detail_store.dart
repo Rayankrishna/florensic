@@ -451,6 +451,17 @@ abstract class _PlantDetailStore with Store {
     photosLoaded = false;
   }
 
+  /// Picks up a write made elsewhere (a check-in replaces the collection's
+  /// copy, not this one) and the photo it may have added.
+  @action
+  Future<void> refreshAfterCheckIn() async {
+    final p = plant;
+    if (p == null) return;
+    final latest = _collection.plantById(p.id);
+    if (latest != null) plant = latest.keepingRiskOf(p);
+    await loadPhotos();
+  }
+
   @action
   Future<void> loadPhotos() async {
     final p = plant;

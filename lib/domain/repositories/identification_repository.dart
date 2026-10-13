@@ -7,9 +7,15 @@ class IdentificationResult {
     required this.confidence,
     required this.rationale,
     required this.alternatives,
+    this.photoId,
   });
 
   final PlantSpecies species;
+
+  /// The uploaded photo this match was made on. Handed to `POST /v1/plants`
+  /// when the plant is kept, so it becomes the plant's first photo and its
+  /// findings open the first treatment plan.
+  final String? photoId;
 
   /// 0–100.
   final int confidence;

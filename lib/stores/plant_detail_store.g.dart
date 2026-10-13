@@ -346,6 +346,42 @@ mixin _$PlantDetailStore on _PlantDetailStore, Store {
     });
   }
 
+  late final _$photosAtom = Atom(
+    name: '_PlantDetailStore.photos',
+    context: context,
+  );
+
+  @override
+  ObservableList<PlantPhoto> get photos {
+    _$photosAtom.reportRead();
+    return super.photos;
+  }
+
+  @override
+  set photos(ObservableList<PlantPhoto> value) {
+    _$photosAtom.reportWrite(value, super.photos, () {
+      super.photos = value;
+    });
+  }
+
+  late final _$photosLoadedAtom = Atom(
+    name: '_PlantDetailStore.photosLoaded',
+    context: context,
+  );
+
+  @override
+  bool get photosLoaded {
+    _$photosLoadedAtom.reportRead();
+    return super.photosLoaded;
+  }
+
+  @override
+  set photosLoaded(bool value) {
+    _$photosLoadedAtom.reportWrite(value, super.photosLoaded, () {
+      super.photosLoaded = value;
+    });
+  }
+
   late final _$environmentDetailAtom = Atom(
     name: '_PlantDetailStore.environmentDetail',
     context: context,
@@ -392,6 +428,28 @@ mixin _$PlantDetailStore on _PlantDetailStore, Store {
     return _$loadPlantDetailsAsyncAction.run(
       () => super.loadPlantDetails(plantId),
     );
+  }
+
+  late final _$refreshAfterCheckInAsyncAction = AsyncAction(
+    '_PlantDetailStore.refreshAfterCheckIn',
+    context: context,
+  );
+
+  @override
+  Future<void> refreshAfterCheckIn() {
+    return _$refreshAfterCheckInAsyncAction.run(
+      () => super.refreshAfterCheckIn(),
+    );
+  }
+
+  late final _$loadPhotosAsyncAction = AsyncAction(
+    '_PlantDetailStore.loadPhotos',
+    context: context,
+  );
+
+  @override
+  Future<void> loadPhotos() {
+    return _$loadPhotosAsyncAction.run(() => super.loadPhotos());
   }
 
   late final _$loadCoursesAsyncAction = AsyncAction(
@@ -552,6 +610,8 @@ isBusy: ${isBusy},
 justWatered: ${justWatered},
 courses: ${courses},
 coursesLoaded: ${coursesLoaded},
+photos: ${photos},
+photosLoaded: ${photosLoaded},
 environmentDetail: ${environmentDetail},
 environmentStatus: ${environmentStatus},
 isLoading: ${isLoading},

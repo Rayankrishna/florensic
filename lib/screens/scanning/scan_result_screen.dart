@@ -37,6 +37,18 @@ class ScanResultScreen extends StatelessWidget {
               return const Center(child: CircularProgressIndicator());
             }
             final species = result.species;
+            // The keeper's own photo leads; the catalogue image and then the
+            // drawing stand in when there is none (or it cannot be read).
+            final shot = store.capture?.file;
+            final artwork = PhotoOrArtwork(
+              url: species.imageUrl,
+              artwork: PlantArtwork(
+                glyph: species.glyph,
+                showGround: false,
+                tint: const Color(0xFF050D05),
+                inset: 0.04,
+              ),
+            );
             return Stack(
               children: [
                 CustomScrollView(
@@ -60,16 +72,17 @@ class ScanResultScreen extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            PhotoOrArtwork(
-                              url: species.imageUrl,
-                              artwork: PlantArtwork(
-                                glyph: species.glyph,
-                                showGround: false,
-                                tint: const Color(0xFF050D05),
-                                inset: 0.04,
-                              ),
-                            ),
-                            if (species.imageUrl != null)
+                            if (shot != null)
+                              Image.file(
+                                shot,
+                                fit: BoxFit.cover,
+                                gaplessPlayback: true,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    artwork,
+                              )
+                            else
+                              artwork,
+                            if (shot != null || species.imageUrl != null)
                               const DecoratedBox(
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(

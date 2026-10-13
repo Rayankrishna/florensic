@@ -105,8 +105,14 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
     }
   }
 
-  void _checkIn(Plant plant) => Navigator.of(context)
-      .pushNamed(AppRoutes.conditionUpdate, arguments: plant);
+  /// Completes once the check-in is saved (its screen is replaced by the
+  /// confirmation) or abandoned; either way, catch up with the collection.
+  Future<void> _checkIn(Plant? plant) async {
+    await Navigator.of(context)
+        .pushNamed(AppRoutes.conditionUpdate, arguments: plant);
+    if (!mounted) return;
+    await _store.refreshAfterCheckIn();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -211,7 +217,10 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                                 const SizedBox(height: AppSpacing.section),
                                 const SectionHeader(title: 'Next actions'),
                                 const SizedBox(height: AppSpacing.lg),
-                                _NextActions(store: _store),
+                                _NextActions(
+                                  store: _store,
+                                  onCheckIn: () => _checkIn(plant),
+                                ),
                                 const SizedBox(height: AppSpacing.section),
                                 SectionHeader(
                                   title: 'Condition history',
@@ -248,10 +257,7 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                       onResume: () async {
                         await _store.resumeActiveCare();
                         if (!context.mounted) return;
-                        Navigator.of(context).pushNamed(
-                          AppRoutes.conditionUpdate,
-                          arguments: _store.plant,
-                        );
+                        await _checkIn(_store.plant);
                       },
                     ),
                   ),
@@ -474,9 +480,10 @@ class _InsightCard extends StatelessWidget {
 }
 
 class _NextActions extends StatelessWidget {
-  const _NextActions({required this.store});
+  const _NextActions({required this.store, required this.onCheckIn});
 
   final PlantDetailStore store;
+  final VoidCallback onCheckIn;
 
   @override
   Widget build(BuildContext context) {
@@ -523,9 +530,7 @@ class _NextActions extends StatelessWidget {
                   ? () => Navigator.of(
                       context,
                     ).pushNamed(AppRoutes.careSchedule, arguments: plant)
-                  : () => Navigator.of(
-                      context,
-                    ).pushNamed(AppRoutes.conditionUpdate, arguments: plant),
+                  : onCheckIn,
             ),
           ),
         ],

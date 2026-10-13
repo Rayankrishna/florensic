@@ -243,9 +243,11 @@ abstract class _PlantCollectionStore with Store {
   }
 
   @action
-  Future<Plant?> addPlant(PlantSpecies species, {String? nickname}) async {
+  Future<Plant?> addPlant(PlantSpecies species,
+      {String? nickname, String? photoId}) async {
     try {
-      final plant = await _repository.addPlant(species, nickname: nickname);
+      final plant = await _repository.addPlant(species,
+          nickname: nickname, photoId: photoId);
       AppLog.i('added ${plant.nickname}', name: 'plants');
       runInAction(() {
         plants.insert(0, plant);

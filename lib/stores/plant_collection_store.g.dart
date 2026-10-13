@@ -284,9 +284,13 @@ mixin _$PlantCollectionStore on _PlantCollectionStore, Store {
   );
 
   @override
-  Future<Plant?> addPlant(PlantSpecies species, {String? nickname}) {
+  Future<Plant?> addPlant(
+    PlantSpecies species, {
+    String? nickname,
+    String? photoId,
+  }) {
     return _$addPlantAsyncAction.run(
-      () => super.addPlant(species, nickname: nickname),
+      () => super.addPlant(species, nickname: nickname, photoId: photoId),
     );
   }
 
