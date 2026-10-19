@@ -3,6 +3,7 @@ import 'package:mobx/mobx.dart';
 import '../domain/models/plant.dart';
 import '../domain/models/plant_health.dart';
 import '../domain/models/plant_photo.dart';
+import '../domain/models/plant_setup.dart';
 import '../domain/models/treatment.dart';
 import '../domain/repositories/plant_repository.dart';
 import '../enum.dart';
@@ -52,6 +53,20 @@ abstract class _PlantDetailStore with Store {
   /// A plant still being saved: only what the scan saw is known yet.
   @computed
   bool get isPending => plant?.pending ?? false;
+
+  /// The add's setup narration for this plant, while the collection is
+  /// following one this session; null otherwise.
+  @computed
+  PlantSetup? get setup {
+    final id = plant?.id;
+    return id == null ? null : _collection.setups[id];
+  }
+
+  /// True while the setup job behind the add is still drafting the
+  /// treatment course and the first care plan — what it writes is not there
+  /// to read yet.
+  @computed
+  bool get isSettingUp => setup?.isTerminal == false;
 
   @computed
   int? get healthScore => plant?.healthScore;
@@ -524,6 +539,13 @@ abstract class _PlantDetailStore with Store {
       AppLog.e('loading treatment plans failed',
           name: 'plants', error: e, stackTrace: stack);
       runInAction(() => coursesLoaded = true);
+    }
+    // Right after an add the course is still being drafted behind the 201;
+    // it is there to read once the setup job says `done`.
+    final pending = _collection.whenSetUp(p.id);
+    if (pending != null) {
+      await pending;
+      if (plant?.id == p.id) await loadCourses();
     }
   }
 

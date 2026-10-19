@@ -773,9 +773,14 @@ class _DetailsStep extends StatelessWidget {
                     onPressed: store.canSave ? onSave : null,
                   ),
                   const SizedBox(height: AppSpacing.md),
+                  // While the job runs the server narrates it — the photo
+                  // being read, the new score — in place of a bare spinner.
                   Text(
-                    'Your next check-in window opens in '
-                    '${plant.schedule.checkInIntervalDays} days.',
+                    store.isSaving && store.progressMessage != null
+                        ? store.progressMessage!
+                        : 'Your next check-in window opens in '
+                            '${plant.schedule.checkInIntervalDays} days.',
+                    textAlign: TextAlign.center,
                     style: AppText.body13.copyWith(fontSize: 14),
                   ),
                 ],

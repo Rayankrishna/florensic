@@ -354,6 +354,7 @@ class HttpClient {
         'photo_not_identification' =>
           'A plant starts from an identification photo. Scan it first.',
         'photo_already_used' => 'That photo already made a plant.',
+        'photo_already_attached' => 'That photo is already on this plant.',
         'species_draft_unavailable' =>
           'We could not add that species just now. Please try again.',
         'species_draft_quota_exceeded' =>

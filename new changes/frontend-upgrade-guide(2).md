@@ -50,6 +50,8 @@ live on the test server at `http://13.202.212.73:8012` — a fixed address now, 
 | `AnalysisJob` (identify) | `species`, `confidence`, `rationale`, `alternatives[]`, `initial_health` | also `findings[] {type, name, problem_id, severity, confidence}` | Optional to show, but a finding with a real severity opens a treatment on the spot |
 | `Me` / `UserOut` | no `timezone` | `timezone` present and **required** (IANA name, `"UTC"` until the app sets one) | Add the field, then see §3.1 |
 | `CareEvent.type` | `added`, `watered`, `condition_update`, `check_in_missed`, `species_corrected`, `resumed` | adds `watering_skipped`, `note`, `treatment_opened`, `treatment_resolved`, `treatment_extended`, `treatment_escalated`, `treatment_superseded`, `treatment_review_deferred`, `treatment_abandoned`, `treatment_step_done`, `treatment_step_skipped`, `treatment_problem_added` | Give the timeline a default icon and label for an unknown type |
+| `POST /v1/plants` response (2026-10-19) | came back complete — the care plan and the treatment drafted **inside** the request (7–30 s) | answers in **~1 s** with the database half (species, score, findings, `cover_photo`) and gains `setup: {job_id, state, stages}`; the course and the first plan are drafted behind it by a **setup job** | Drop the add spinner: open the plant page on the 201, poll `GET /v1/plants/{id}/setup` every ~1 s, show the newest stage's `message` verbatim, and on `done` refetch courses, care plan and today's tasks — a course read right after the 201 is legitimately empty for a few seconds |
+| `GET /v1/analysis/{job_id}`, check-in poll (2026-10-19) | nothing to show while `running` | gains `progress[]` — stage lines `{stage, message, at, data?}`: `reading_photo`, `scored` (`data: {score, delta}`), `reviewing_treatments` (only with open treatments), `revising_plan`, then `done`/`failed` | Additive, safe to ignore — but render the newest `message` instead of a bare spinner; an identification job's `progress` is always `[]` |
 
 **Today's list says which plan a step belongs to.** A `treatment_step` task on
 `GET /v1/care/today` gains `course_id`, `problem_id` and `problem`. `problem_id: "all"` (with
@@ -318,5 +320,7 @@ documented in §4 and §7 of the API guide rather than in its §9 table.
 - [ ] Add the new `CareEvent.type` values to the timeline, with a default for unknown ones.
 - [ ] Add `task_not_skippable`, `plant_not_active`, `treatment_not_found`, `treatment_not_open`, `course_not_found`, `course_not_open` and `invalid_timezone` to the error mapper.
 - [ ] Refetch `GET /v1/care/today` after a plant is seen to be paused, since its environment tasks are gone.
+- [ ] Add `setup {job_id, state, stages[]}` to the add response; on the 201 open the plant page, poll `GET /v1/plants/{id}/setup` every ~1 s to `done`/`failed`, render the newest stage's `message`, and on `done` refetch the plant's courses, care plan and today's tasks (the course is no longer there at the 201).
+- [ ] Add `progress[]` (`{stage, message, at, data?}`) to `AnalysisJob` and show its newest `message` while a check-in polls; add `setup_not_found` to the error mapper.
 - [ ] Fix the profile screen so `stats.average_health` of `0` reads as "nothing scored yet", not "0 % healthy".
 - [ ] Delete any `include_v2` query parameter and any `health_v2` / `breakdown_v2` field from the client.

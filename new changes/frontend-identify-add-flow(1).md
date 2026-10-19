@@ -1,6 +1,6 @@
 # Identify and add: the new flow
 
-_Written 2026-10-16 for the Florensic Flutter app. The identification pipeline was rebuilt for
+_Written 2026-10-16 for the Florensic Flutter app; the add's staged progress added 2026-10-19. The identification pipeline was rebuilt for
 speed and the add call changed shape. This is the one document to work from for the scan → add →
 correct flow; [`frontend-api-guide.md`](frontend-api-guide.md) stays the full reference and
 [`frontend-upgrade-guide.md`](frontend-upgrade-guide.md) §2 has the same changes as a
@@ -16,6 +16,7 @@ before/after table. Everything here is live on the test server._
 | Correcting a wrong identification | resolve took ~10 s | resolve answers in **milliseconds** |
 | `no_confident_match` | possible job state | switched off — you will not see it |
 | Own check-in photo sent to add | `404 photo_not_found` | **`409 photo_not_identification`** |
+| `POST /v1/plants` wait | 7–30 s, spinner | **~1 s**, then a narrated setup (2026-10-19, below) |
 
 ## Flow A — scan and keep (the normal path)
 
@@ -51,10 +52,47 @@ POST /v1/plants {photo_id, nickname?, room?, indoor?}
 ```
 
 **Do not send `species_id` here.** Omitting it means "keep it as whatever the scan said", and the
-server creates the catalogue entry itself when it has to. The plant comes back complete: score
-anchored from the scan, care plan, `cover_photo`, and one treatment course if the findings carried
-a severity. Budget ~7–17 s for this call (the care plan and treatment drafting run inside it) and
-keep the spinner.
+server creates the catalogue entry itself when it has to.
+
+The 201 comes back in **about a second** with the plant's database half: the species, the score
+anchored from the scan, its problems, `cover_photo` — open the plant page straight away. What it
+does **not** have yet is the slow half: the treatment course (when the findings carried a severity)
+and the first care plan. Those are drafted behind the response by a **setup job**, and the 201
+carries one extra block to watch it with:
+
+```
+"setup": {"job_id": "…", "state": "queued", "stages": []}
+```
+
+**4. Narrate the setup.** Poll about once a second until `state` is `done` or `failed`:
+
+```
+GET /v1/plants/{plant_id}/setup
+→ {job_id, state, stages: [{stage, message, at, data?}]}
+```
+
+Render the newest stage's `message` in a one-line strip on the plant page — it is written for the
+owner and meant to be shown verbatim. A sick plant reads:
+
+| `stage` | example `message` | `data` |
+|---|---|---|
+| `opening_treatment` | Problem found — creating a treatment for mealybugs… | `{problems: ["Mealybugs"]}` |
+| `treatment_ready` | Treatment ready, 5 steps | `{courses, steps}` |
+| `drafting_plan` | Writing the care plan… | — |
+| `plan_ready` | Care plan ready | `{revision_id}` |
+| `plan_failed` | Couldn't write the care plan just now — it will be tried again | `{error}` |
+| `done` | Done | — |
+
+A healthy plant has no treatment lines. `plan_failed` is not a failure of the setup: the job still
+ends `done`, the plant is fully usable, and the plan is written at the next revision trigger.
+`state: failed` (a final `failed` line) is rare and also leaves the plant usable.
+
+**`done` is the refetch signal.** The course arrives behind the poll now: on `done`, refetch
+`GET /v1/plants/{id}/courses`, `GET /v1/plants/{id}/care-plan` and `GET /v1/care/today`. A course
+read immediately after the 201 is legitimately empty for a few seconds. Expect `done` ~5 s after
+the 201 for a healthy plant and 10–25 s for one that needs treatment. A setup that stays `queued`
+means the worker is behind; keep polling or stop after a minute and refetch later — nothing is
+lost.
 
 ## Flow B — the scan is wrong and the user knows better
 
@@ -118,7 +156,12 @@ the typeahead (Flow B) or a retake.
 - [ ] Swap the 404 match on add-with-check-in-photo for `409 photo_not_identification`.
 - [ ] Add the three `identification_*` codes and `species_name_unusable` to the add call's error
       handling, per the table above.
-- [ ] Shorten the identify spinner copy: ~5 s, not up to a minute. Keep the add spinner.
+- [ ] Shorten the identify spinner copy: ~5 s, not up to a minute.
+- [ ] Drop the add spinner: open the plant page on the 201, poll `GET /v1/plants/{id}/setup`
+      every ~1 s, show the newest stage's `message` in a strip, stop on `done`/`failed`.
+- [ ] On setup `done`, refetch the plant's courses, care plan and today's tasks.
 
-Nothing else moved: auth, polling shape, photos and `cover_photo`, check-ins, tasks, treatments
-and the home feed are all exactly as documented in the main guide.
+Nothing else moved: auth, polling shape, photos and `cover_photo`, tasks, treatments and the home
+feed are all exactly as documented in the main guide. Check-ins gained one additive field: the
+poll's `progress[]` narrates them the same way (`reading_photo`, `scored` with `{score, delta}`,
+`reviewing_treatments`, `revising_plan`, then `done`/`failed`) — see the main guide, Flow 4.

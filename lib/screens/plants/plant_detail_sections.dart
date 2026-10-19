@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../domain/models/plant.dart';
 import '../../domain/models/plant_health.dart';
 import '../../domain/models/plant_photo.dart';
+import '../../domain/models/plant_setup.dart';
 import '../../domain/models/treatment.dart';
 import '../../enum.dart';
 import '../../key.dart';
@@ -398,11 +399,61 @@ class DraftHealthCard extends StatelessWidget {
               const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Text(
-                  'Working out its health score and care plan…',
+                  'Saving your plant…',
                   style: AppText.body13.copyWith(fontSize: 13),
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The add's slow half, narrated: the newest stage of the setup job that
+/// drafts the treatment course and the first care plan behind the 201. The
+/// message is the server's, written for the owner and shown verbatim.
+class SetupProgressStrip extends StatelessWidget {
+  const SetupProgressStrip({super.key, required this.setup});
+
+  final PlantSetup setup;
+
+  @override
+  Widget build(BuildContext context) {
+    final failed = setup.isFailed;
+    final message = setup.latest?.message ??
+        (failed ? 'Setup did not finish.' : 'Setting up…');
+    return SoftCard(
+      color: failed ? AppColors.cautionTint : AppColors.leafSoft,
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+      child: Row(
+        children: [
+          if (failed)
+            const PgIcon(PgIcons.alertTriangle,
+                size: 18, color: AppColors.cautionDeep)
+          else
+            const SizedBox.square(
+              dimension: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.2,
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.ink),
+              ),
+            ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              child: Text(
+                message,
+                key: ValueKey(message),
+                style: AppText.body13.copyWith(
+                  fontSize: 13.5,
+                  color: AppColors.ink,
+                ),
+              ),
+            ),
           ),
         ],
       ),

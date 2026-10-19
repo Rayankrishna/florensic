@@ -3,6 +3,7 @@ import '../../../interceptors/api_interceptor.dart';
 import '../../models/care_task.dart';
 import '../../models/plant.dart';
 import '../../models/plant_photo.dart';
+import '../../models/plant_setup.dart';
 import '../../models/treatment.dart';
 import '../../provider/photos.provider.dart';
 import '../../provider/plants.provider.dart';
@@ -73,8 +74,9 @@ class RemotePlantRepository implements PlantRepository {
           {String? note}) =>
       _plants.abandonCourse(courseId, reason.wire, note: note);
 
-  /// The server scores the photo, writes the care plan and, on a sick scan,
-  /// opens a treatment plan inside this request — budget 7–17 s. A photo
+  /// Answers in about a second with the plant's database half — species,
+  /// score, findings, cover — and a `setup` block; the treatment course and
+  /// the first care plan are drafted behind it (see [loadSetup]). A photo
   /// whose identification has not finished answers
   /// `identification_not_ready`; that one is polled a few times before it is
   /// given up on, since the job is seconds from done.
@@ -103,6 +105,9 @@ class RemotePlantRepository implements PlantRepository {
   static const int _notReadyRetries = 10;
 
   @override
+  Future<PlantSetup> loadSetup(String plantId) => _plants.setup(plantId);
+
+  @override
   Future<void> removePlant(String plantId) =>
       _plants.remove(plantId, keepPhotos: keepPhotosOnRemove);
 
@@ -128,6 +133,7 @@ class RemotePlantRepository implements PlantRepository {
     required ConditionVerdict verdict,
     required List<String> observations,
     required String note,
+    void Function(JobStage stage)? onProgress,
   }) async {
     final photoId = pendingCheckInPhotoId;
     if (photoId == null) {
@@ -145,7 +151,13 @@ class RemotePlantRepository implements PlantRepository {
     );
     pendingCheckInPhotoId = null;
 
-    final job = await _photos.awaitJob(jobId);
+    final job = await _photos.awaitJob(
+      jobId,
+      onTick: (current) {
+        final stage = current.progress.lastOrNull;
+        if (stage != null) onProgress?.call(stage);
+      },
+    );
     if (job.isFailed) {
       throw ApiException(
         job.error?.isNotEmpty == true

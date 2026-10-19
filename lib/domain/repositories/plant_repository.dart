@@ -3,6 +3,7 @@ import '../models/care_task.dart';
 import '../models/plant.dart';
 import '../models/plant_condition_update.dart';
 import '../models/plant_photo.dart';
+import '../models/plant_setup.dart';
 import '../models/treatment.dart';
 
 /// The keeper's collection.
@@ -21,11 +22,14 @@ abstract class PlantRepository {
   /// window forward; never moves the health score.
   Future<Plant> addNote(String plantId, List<NoteChip> chips, {String? text});
 
+  /// [onProgress] gets each new stage the analysis job writes while it
+  /// runs, so the screen can narrate the wait with the server's own words.
   Future<CheckInResult> submitConditionUpdate(
     String plantId, {
     required ConditionVerdict verdict,
     required List<String> observations,
     required String note,
+    void Function(JobStage stage)? onProgress,
   });
 
   /// Paused plants only; a stale plant comes back through a check-in.
@@ -51,12 +55,17 @@ abstract class PlantRepository {
 
   /// Keeps a plant from its identification photo, which is required: the
   /// score, findings and cover come from it. [speciesId] goes only when the
-  /// keeper corrected the identification.
+  /// keeper corrected the identification. Answers in about a second with
+  /// the plant's database half; its treatments and first care plan follow
+  /// through [loadSetup].
   Future<Plant> addPlant({
     required String photoId,
     String? speciesId,
     String? nickname,
   });
+
+  /// The setup job that runs behind an add, to poll until it is terminal.
+  Future<PlantSetup> loadSetup(String plantId);
 
   Future<void> removePlant(String plantId);
 

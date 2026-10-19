@@ -197,6 +197,14 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                             children: [
                               PlantPhotoCard(plant: plant),
                               const SizedBox(height: AppSpacing.lg),
+                              // The add's slow half, narrated while the
+                              // setup job drafts treatments and the plan.
+                              if (_store.setup != null &&
+                                  (_store.isSettingUp ||
+                                      _store.setup!.isFailed)) ...[
+                                SetupProgressStrip(setup: _store.setup!),
+                                const SizedBox(height: AppSpacing.lg),
+                              ],
                               // Branch on care status for paused; a null
                               // score means never scored, not paused.
                               if (plant.pending)
@@ -238,7 +246,9 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                                 const SizedBox(height: AppSpacing.lg),
                                 TreatmentsSummaryCard(
                                   course: _store.openCourse,
-                                  loaded: _store.coursesLoaded,
+                                  // Empty until the setup job is done.
+                                  loaded: _store.coursesLoaded &&
+                                      !_store.isSettingUp,
                                   onOpen: () => Navigator.of(context).pushNamed(
                                       AppRoutes.treatments,
                                       arguments: _store),

@@ -8,6 +8,7 @@ import '../core/services_config.dart';
 import '../models/plant.dart';
 import '../models/plant_condition_update.dart';
 import '../models/plant_photo.dart';
+import '../models/plant_setup.dart';
 import '../models/plant_species.dart';
 
 /// Where a photo came from and what it is for.
@@ -29,6 +30,7 @@ class AnalysisJob {
     this.checkin,
     this.error,
     this.retryable = false,
+    this.progress = const [],
   });
 
   factory AnalysisJob.fromJson(Map<String, dynamic> json) {
@@ -53,6 +55,7 @@ class AnalysisJob {
       checkin: json['checkin'] == null ? null : Json.map(json['checkin']),
       error: Json.str(json['error']),
       retryable: Json.boolean(json['retryable']),
+      progress: Json.list(json['progress']).map(JobStage.fromJson).toList(),
     );
   }
 
@@ -83,6 +86,12 @@ class AnalysisJob {
   final Map<String, dynamic>? checkin;
   final String? error;
   final bool retryable;
+
+  /// What the job has done so far, oldest first — a check-in narrates
+  /// itself (`reading_photo`, `scored`, `reviewing_treatments`,
+  /// `revising_plan`, then `done`/`failed`) and the newest message is shown
+  /// in place of a bare spinner. An identification's is always empty.
+  final List<JobStage> progress;
 
   bool get isTerminal => const {'done', 'no_confident_match', 'failed'}
       .contains(state);

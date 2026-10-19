@@ -658,7 +658,7 @@
           "species"
         ],
         "summary": "Turn a picked suggestion into a species you can keep",
-        "description": "200 when we already had the plant, 201 when this call drafted it.\n\nA first resolve of a plant nobody has picked before takes about ten seconds: one text\nmodel call writes its care card. Every later resolve of the same plant, under any of\nits names, is a lookup.",
+        "description": "200 when we already had the plant, 201 when this call created it.\n\nUnder a second either way. A plant nobody has picked before is one insert of a row\ncarrying its name; the care card is written afterwards by `species.draft`, which then\nrevises the plan of every plant of that species (`species_enriched`). It used to be\n9.4-10.6s here, in the middle of the owner correcting an identification.\n\nA species that is still bare answers with empty strings and the catalogue's own\ndefaults (`species_to_out`), which is what `review_status: \"draft\"` has always meant.",
         "operationId": "resolve_v1_species_resolve_post",
         "requestBody": {
           "content": {
@@ -1014,6 +1014,55 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PlantOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/plants/{plant_id}/setup": {
+      "get": {
+        "tags": [
+          "plants"
+        ],
+        "summary": "Poll the setup that runs after an add (treatments, first care plan)",
+        "description": "The newest setup job for this plant: one row read, meant to be polled about once a\nsecond until `state` is `done` or `failed`. `stages` is the narration, oldest first.",
+        "operationId": "plant_setup_v1_plants__plant_id__setup_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "plant_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Plant Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupOut"
                 }
               }
             }
@@ -1853,6 +1902,65 @@
         }
       }
     },
+    "/v1/photos/{photo_id}/{variant}": {
+      "get": {
+        "tags": [
+          "photos"
+        ],
+        "summary": "The image itself (original | working | thumb)",
+        "description": "Streams one derivative from storage behind the owner's token. This is what the\n`urls` of a photo and a plant's `cover_photo` point at in `proxy` mode, so an app\nreached through one tunnel can show pictures with the same base URL and bearer it\nuses for everything else. Not for caching across users: `Cache-Control` is private.",
+        "operationId": "get_photo_bytes_v1_photos__photo_id___variant__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "photo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Photo Id"
+            }
+          },
+          {
+            "name": "variant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "original",
+                "working",
+                "thumb"
+              ],
+              "type": "string",
+              "title": "Variant"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The image bytes",
+            "content": {
+              "image/jpeg": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/analysis/{job_id}": {
       "get": {
         "tags": [
@@ -2323,6 +2431,17 @@
               }
             ]
           },
+          "scientific_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scientific Name"
+          },
           "confidence": {
             "anyOf": [
               {
@@ -2379,6 +2498,14 @@
                 "type": "null"
               }
             ]
+          },
+          "progress": {
+            "items": {
+              "$ref": "#/components/schemas/StageOut"
+            },
+            "type": "array",
+            "title": "Progress",
+            "default": []
           },
           "error": {
             "anyOf": [
@@ -3579,6 +3706,44 @@
         "title": "CourseStepOut",
         "description": "One step of a course, with the problem it is for already resolved.\n\n`TreatmentStepOut` says which **row** a step hangs from (`treatment_id`) and whether it\nis shared (`serves`); working out which *problem* it is for from those two means\njoining back to `problems[]`. `GET /v1/care/today` already answers that question\ndirectly for a `treatment_step` task, and two surfaces answering the same question two\nways is a thing a client gets wrong once each."
       },
+      "CoverPhotoOut": {
+        "properties": {
+          "photo_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Photo Id"
+          },
+          "thumb": {
+            "type": "string",
+            "title": "Thumb"
+          },
+          "working": {
+            "type": "string",
+            "title": "Working"
+          },
+          "captured_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Captured At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "photo_id",
+          "thumb",
+          "working",
+          "captured_at"
+        ],
+        "title": "CoverPhotoOut",
+        "description": "The newest photo attached to a plant, for the card and the grid: one picture per\nplant without a call per plant. `thumb` and `working` are signed links valid\n`s3_presign_ttl_seconds` (15 min) — refetch the plant rather than cache them. The\nfull gallery is `GET /v1/plants/{id}/photos`."
+      },
       "DailyInsightOut": {
         "properties": {
           "id": {
@@ -4479,9 +4644,21 @@
       },
       "PlantCreateIn": {
         "properties": {
-          "species_id": {
+          "photo_id": {
             "type": "string",
             "format": "uuid",
+            "title": "Photo Id"
+          },
+          "species_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Species Id"
           },
           "nickname": {
@@ -4520,25 +4697,14 @@
               }
             ],
             "title": "Indoor"
-          },
-          "photo_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Photo Id"
           }
         },
         "type": "object",
         "required": [
-          "species_id"
+          "photo_id"
         ],
-        "title": "PlantCreateIn"
+        "title": "PlantCreateIn",
+        "description": "A plant always starts from a photograph.\n\n`photo_id` is **required**. Adding without one produced a plant with\n`health_score: null`, no findings and no treatments, because there was no evidence to\nscore it against — a state the product does not want to exist.\n\n`species_id` is **optional**, and present means the owner picked it: either they\nconfirmed what we said or they corrected it. Absent means \"take what the photo's own\nidentification found\", which is the ordinary path — and when the identification found a\nplant we do not carry, the add is what creates the catalogue row."
       },
       "PlantOut": {
         "properties": {
@@ -4651,6 +4817,16 @@
             "type": "integer",
             "title": "Photo Count"
           },
+          "cover_photo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CoverPhotoOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "streak_weeks": {
             "type": "integer",
             "title": "Streak Weeks"
@@ -4670,6 +4846,16 @@
           "needs_attention": {
             "type": "boolean",
             "title": "Needs Attention"
+          },
+          "setup": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SetupOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -5157,6 +5343,34 @@
         ],
         "title": "ScheduleOut"
       },
+      "SetupOut": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Job Id"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "stages": {
+            "items": {
+              "$ref": "#/components/schemas/StageOut"
+            },
+            "type": "array",
+            "title": "Stages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "state",
+          "stages"
+        ],
+        "title": "SetupOut",
+        "description": "The slow half of an add, as the app polls it (`GET /v1/plants/{id}/setup`)."
+      },
       "SignInIn": {
         "properties": {
           "email": {
@@ -5467,6 +5681,43 @@
           "tone"
         ],
         "title": "SpeciesTag"
+      },
+      "StageOut": {
+        "properties": {
+          "stage": {
+            "type": "string",
+            "title": "Stage"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "stage",
+          "message",
+          "at"
+        ],
+        "title": "StageOut",
+        "description": "One step a job has reached. `message` is written for the owner and is meant to be\nrendered verbatim; `stage` is the stable code an app may branch on; `data` carries the\nnumbers behind the message (counts, a score) when there are any."
       },
       "SuggestOut": {
         "properties": {

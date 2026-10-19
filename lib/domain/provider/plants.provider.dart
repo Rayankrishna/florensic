@@ -4,6 +4,7 @@ import '../models/care_task.dart';
 import '../models/plant.dart';
 import '../models/plant_care_schedule.dart';
 import '../models/plant_health.dart';
+import '../models/plant_setup.dart';
 import '../models/treatment.dart';
 
 /// `/v1/plants/*` and `/v1/care/*`.
@@ -157,6 +158,14 @@ class PlantsProvider {
 
   Future<Map<String, dynamic>> carePlan(String id) =>
       _http.get('/plants/$id/care-plan', Json.map);
+
+  /// The setup job behind an add: polled about once a second until `done`
+  /// or `failed`. `404 setup_not_found` is a plant added before setups
+  /// existed.
+  Future<PlantSetup> setup(String id) => _http.get(
+        '/plants/$id/setup',
+        (json) => PlantSetup.fromJson(Json.map(json)),
+      );
 
   Future<List<CareTask>> todaysCare() => _http.get(
         '/care/today',

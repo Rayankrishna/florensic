@@ -23,6 +23,20 @@ mixin _$PlantDetailStore on _PlantDetailStore, Store {
     () => super.isPending,
     name: '_PlantDetailStore.isPending',
   )).value;
+  Computed<PlantSetup?>? _$setupComputed;
+
+  @override
+  PlantSetup? get setup => (_$setupComputed ??= Computed<PlantSetup?>(
+    () => super.setup,
+    name: '_PlantDetailStore.setup',
+  )).value;
+  Computed<bool>? _$isSettingUpComputed;
+
+  @override
+  bool get isSettingUp => (_$isSettingUpComputed ??= Computed<bool>(
+    () => super.isSettingUp,
+    name: '_PlantDetailStore.isSettingUp',
+  )).value;
   Computed<int?>? _$healthScoreComputed;
 
   @override
@@ -656,6 +670,8 @@ environmentStatus: ${environmentStatus},
 draftNeedsSpeciesPick: ${draftNeedsSpeciesPick},
 isLoading: ${isLoading},
 isPending: ${isPending},
+setup: ${setup},
+isSettingUp: ${isSettingUp},
 healthScore: ${healthScore},
 band: ${band},
 careStatus: ${careStatus},

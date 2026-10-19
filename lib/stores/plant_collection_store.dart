@@ -5,6 +5,7 @@ import '../domain/models/plant.dart';
 import '../domain/models/plant_species.dart';
 import '../domain/repositories/plant_repository.dart';
 import '../domain/models/plant_health.dart';
+import '../domain/models/plant_setup.dart';
 import '../enum.dart';
 import '../interceptors/api_interceptor.dart';
 import '../utils/app_log.dart';
@@ -256,6 +257,20 @@ abstract class _PlantCollectionStore with Store {
   @observable
   bool addNeedsSpeciesPick = false;
 
+  /// The setup narration of each plant added this session, by plant id —
+  /// the strip on the plant page reads it. A terminal entry stays so the
+  /// page can tell the add has finished.
+  @observable
+  ObservableMap<String, PlantSetup> setups =
+      ObservableMap<String, PlantSetup>();
+
+  /// Setup jobs still being followed, by plant id.
+  final Map<String, Future<void>> _settingUp = {};
+
+  /// Completes when [plantId]'s setup job has ended; null when none is
+  /// being followed — the courses and plan are there to read.
+  Future<void>? whenSetUp(String plantId) => _settingUp[plantId];
+
   /// How [draftId] settles; null once it is no longer a known draft.
   Future<Plant?>? whenAdded(String draftId) => _adding[draftId];
 
@@ -322,9 +337,53 @@ abstract class _PlantCollectionStore with Store {
         plants[i] = plant;
       }
     });
-    // A sick scan opens a treatment plan whose first steps are due today.
-    await refreshTodaysCare();
+    _watchSetup(plant);
     return plant;
+  }
+
+  /// Follows the setup job behind an add. The treatment course and the
+  /// first care plan are drafted after the 201, narrated a stage at a time;
+  /// `done` is the signal to refetch what it wrote — today's tasks here, the
+  /// courses on the plant page (see [whenSetUp]).
+  void _watchSetup(Plant plant) {
+    final initial = plant.setup;
+    if (initial == null) {
+      // No setup to follow: whatever the add wrote is already there.
+      refreshTodaysCare();
+      return;
+    }
+    runInAction(() => setups[plant.id] = initial);
+    if (initial.isTerminal) {
+      refreshTodaysCare();
+      return;
+    }
+    _settingUp[plant.id] = _pollSetup(plant.id)
+        .whenComplete(() => _settingUp.remove(plant.id));
+  }
+
+  Future<void> _pollSetup(String plantId) async {
+    // A setup that stays queued means the worker is behind: give it a
+    // minute and stop — nothing is lost, the next read catches up.
+    final deadline = DateTime.now().add(const Duration(seconds: 90));
+    while (DateTime.now().isBefore(deadline) && plantById(plantId) != null) {
+      await Future<void>.delayed(const Duration(seconds: 1));
+      final PlantSetup current;
+      try {
+        current = await _repository.loadSetup(plantId);
+      } on ApiException catch (e) {
+        AppLog.w('setup poll for $plantId failed: ${e.code}', name: 'plants');
+        if (e.isOffline || e.statusCode == 404) break;
+        continue;
+      } catch (e, stack) {
+        AppLog.e('setup poll for $plantId failed',
+            name: 'plants', error: e, stackTrace: stack);
+        break;
+      }
+      runInAction(() => setups[plantId] = current);
+      if (current.isTerminal) break;
+    }
+    // A sick scan's treatment steps are due today once the setup is done.
+    await refreshTodaysCare();
   }
 
   @action

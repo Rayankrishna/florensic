@@ -22,7 +22,7 @@ promise about a route you cannot call.
 | Days | A "day" is the **owner's** day, in the zone on their profile (`PATCH /v1/me {timezone}`, default `"UTC"`). Every date the API answers with — a watering's due date, today's task list, a check-in window, an insight's `day` — is a date on that calendar, so set the timezone at sign-in and render dates as plain local dates rather than converting them. Timestamps are still UTC instants: convert those. **`meta.timezone` tells you which calendar each document is on, and all three now report the owner's zone** — the home feed's, the insights feed's and the care plan's, the last of which said `"UTC"` until plan items and treatment steps were dated on the owner's day too. Read it rather than assuming. The daily upload and analysis quotas also reset on a UTC day, which is ours rather than the owner's. |
 | Errors | One envelope for every failure, including validation: `{"error": {"code": "plant_not_paused", "message": "This plant is already under active care."}}`. Switch on `code` (stable); `message` is safe to show. 422 adds `details` from validation. Full list in §9. |
 | Rate limits | Auth routes 10/min per IP; public reads (species, suggest) 60/min per IP; OTP 5/hour per email. Over the limit → 429 `rate_limited`. **Debounce the species typeahead (~300 ms).** |
-| Async jobs | Photo analysis is a job. Upload → `202 {job_id}` → poll `GET /v1/analysis/{job_id}` every ~2 s until `state` is `done`, `no_confident_match` or `failed`. Identification takes ~10–60 s; a check-in ~10–40 s. `retryable: true` on a failure means "try the same request again later". |
+| Async jobs | Photo analysis is a job. Upload → `202 {job_id}` → poll `GET /v1/analysis/{job_id}` every ~2 s until `state` is `done`, `no_confident_match` or `failed`. Identification takes **~5 s** (measured 3.0–4.9 s); a check-in ~10–40 s. `retryable: true` on a failure means "try the same request again later". A check-in's poll also carries `progress[]` — owner-readable stage lines the job writes as it runs (§5); an identification's is empty. |
 | Full plant on write | Every plant mutation (create, patch, water, resume, schedule) returns the **full `Plant`**, so you can replace local state from the response instead of refetching. |
 | Location | Send `lat`/`lon` with photo uploads when the user allows it. Coordinates are stored server-side only and **never** appear in any response; weather, home area and insights depend on them. |
 | Weather attribution | Wherever the app shows insights or the care plan's weather reasoning, display `meta.attribution` — always `"Weather data by Open-Meteo.com (CC BY 4.0)"`. |
@@ -57,9 +57,16 @@ POST /v1/photos  (multipart)                        → 202 {job_id, photo_id}
    lat?, lon?, location_accuracy_m?, captured_at?
 GET  /v1/analysis/{job_id}   (poll ~2 s)            → 200 AnalysisJob
    state: queued → running → done | no_confident_match | failed
-POST /v1/plants {species_id, photo_id, nickname?, room?, indoor?}   → 201 Plant
-GET  /v1/plants/{plant_id}/care-plan                → 200 CarePlan   (first plan is written on creation)
+POST /v1/plants {photo_id, species_id?, nickname?, room?, indoor?}   → 201 Plant  (+ setup {job_id, state, stages})
+GET  /v1/plants/{plant_id}/setup                    → 200 {job_id, state, stages[]}   (poll ~1 s until done)
+GET  /v1/plants/{plant_id}/care-plan                → 200 CarePlan   (first plan is written by the setup job)
 ```
+
+**`photo_id` is required** on `POST /v1/plants`, and `species_id` is **optional** and means
+"the user picked this one" — either they confirmed what we said or they corrected it. Leave it
+out and the plant is kept as whatever the photo's own identification found. A plant with no
+photograph has no health score, no findings and no treatments, which is why the API no longer
+makes one.
 
 **Reading the result.** When `state == "done"`: `species` (full `Species`, use its `id` for the
 create call), `confidence` 0–100, `rationale`, `alternatives[]` (`{species|null, scientific_name,
@@ -68,8 +75,20 @@ severity}`. Since `identify.v2` the same response also carries `findings[]`
 (`{type, name, problem_id, severity, confidence}`) — the typed problems the scan actually saw,
 where `problem_id` is a stable taxonomy id (`pest.spider_mite`, `abiotic.low_humidity`, …) you
 can group, count and compare across check-ins, unlike the free-text `name`; it is `null` only on
-rows written before the taxonomy existed. `no_confident_match` means confidence was under 40 or
-the species could not be resolved — show the alternatives and the search field instead of a result card.
+rows written before the taxonomy existed. A `problem_id` may start as `<type>.other` and become
+more precise a moment later — a background pass refines the names our taxonomy did not recognise,
+so re-read rather than caching it.
+
+**Identification takes about 5 s** (one vision call), down from 16.8 s on average. It no longer
+writes a catalogue entry, which is why:
+
+- **`species` can be `null` on `done`.** That no longer means "we could not tell". Show
+  **`scientific_name`** — always present on a finished identification — and send the `photo_id`
+  to `POST /v1/plants`, which makes the catalogue row. `species` is non-null only for a plant we
+  already carry, and then you can link through to its page.
+- `no_confident_match` is **switched off** by configuration and will not be returned; keep
+  handling it, since one env value brings it back. Show the alternatives and the search field
+  whenever the user says the answer is wrong, not only on that state.
 
 **If the user says the result is wrong — the correction search field.**
 
@@ -85,17 +104,27 @@ GET /v1/species/suggest?q=<typed text>&limit=8     (public; debounce ~300 ms; 2+
 ```
 POST /v1/species/resolve {source, species_id?, external_id?, scientific_name, matched_term?}   (auth)
 → 200 {species_id, scientific_name, created: false}   we already had the plant
-→ 201 {species_id, scientific_name, created: true}    we drafted it for the catalogue
+→ 201 {species_id, scientific_name, created: true}    this call added it to the catalogue
 ```
 
-  Then `POST /v1/plants {species_id, photo_id?, …}` for a new plant, or `POST /v1/plants/{plant_id}/species {species_id}` to correct one you already have. A `catalogue` row resolves instantly; an `inaturalist` row we have never seen takes **~10 s** (one model call writes its care card), so show a spinner and allow 30 s. `503 species_draft_unavailable` means the model, GBIF or the day's budget refused — offer a retry; `429 species_draft_quota_exceeded` means this user has added their day's worth of new species (5), which only ever happens on the drafting path — plants we already carry still resolve. `scientific_name` must look like one (letters, spaces, `-`, `.`, `'`, `×`) and `matched_term` is capped at 120 characters; send the suggestion back unchanged and neither can bite. Resolving the same plant twice, under any of its names, always returns the same `species_id` with `created: false`.
+  Then `POST /v1/plants {photo_id, species_id, …}` for a new plant — the photo is still the one
+  that was scanned, so the plant still anchors its health and its treatments on it — or
+  `POST /v1/plants/{plant_id}/species {species_id}` to correct one you already have. **Both kinds
+  of row now resolve in well under a second** (it used to be ~10 s for a plant we had never seen).
+  A species we have just added carries empty care-card fields and `review_status: "draft"` until
+  a background pass fills it in, usually within a minute; its care plan is then revised
+  automatically. `503 species_draft_unavailable` means the day's budget refused — offer a retry;
+  `400 species_name_unusable` means the name names nothing (empty, or `unknown`);
+  `429 species_draft_quota_exceeded` means this user has added their day's worth of new species (5), which only ever happens on the drafting path — plants we already carry still resolve. `scientific_name` must look like one (letters, spaces, `-`, `.`, `'`, `×`) and `matched_term` is capped at 120 characters; send the suggestion back unchanged and neither can bite. Resolving the same plant twice, under any of its names, always returns the same `species_id` with `created: false`.
 - Under 3 characters only the catalogue is searched; a provider outage still returns catalogue hits. The typeahead learns: the name a user types to reach a plant becomes one of that species' common names, so the next person matches our catalogue directly.
 
-**Photos of a plant.** `GET /v1/plants/{plant_id}/photos` → `Photo[]`; `GET /v1/photos/{photo_id}` → `Photo` with `urls {original, working, thumb}` — signed URLs valid **15 min**, refetch rather than cache them.
+**Photos of a plant.** `GET /v1/plants/{plant_id}/photos` → `Photo[]`; `GET /v1/photos/{photo_id}` → `Photo` with `urls {original, working, thumb}`. **Load them with the same bearer token you use for every call**: on the test server the links are this API's own `GET /v1/photos/{id}/{variant}` (`original | working | thumb`), which streams the image behind your token, so they work on a phone against the test server's base URL (`Image.network(url, headers: {'Authorization': 'Bearer …'})` or `CachedNetworkImage(httpHeaders: …)`). In production the same fields carry signed storage links instead; either way treat them as short-lived and refetch rather than cache them. 404 `photo_not_found` for a photo that is not yours.
+
+**The plant's own picture.** Every `Plant` carries `cover_photo` — its newest photo as `{photo_id, thumb, working, captured_at}` with links of the same kind as above, or `null` for a plant kept without a photo — on the list, on detail and on the create response, so a grid needs no call per plant. The links expire like any signed URL (15 min): refetch the plant, do not cache them. The gallery route above is for everything else.
 
 Uploads: JPEG/PNG/HEIC, ≤ 12 MB, short side ≥ 480 px; `413 payload_too_large` otherwise. Daily caps per user: uploads and analyses (`upload_quota_exceeded`, `analysis_quota_exceeded`, both 429).
 
-**What a sick scan sets in motion.** If the identification's `findings[]` carry a severity, `POST /v1/plants` does more than keep the plant: its `health_score` anchors below the clean 90, a care plan is written, and **one treatment plan opens** covering every problem found — read it at `GET /v1/plants/{plant_id}/courses` right after the add, and its first steps are already on `GET /v1/care/today` as `treatment_step` tasks (Flow 3). `POST /v1/plants` can take a little while on a sick scan because the plan is drafted inside the request; show a spinner, do not retry.
+**What a sick scan sets in motion.** If the identification's `findings[]` carry a severity, `POST /v1/plants` does more than keep the plant: its `health_score` anchors below the clean 90, and — behind the response — **one treatment plan opens** covering every problem found, before the first care plan is written. The 201 answers in **about a second** with only the database half (species, score, findings, `cover_photo`) and carries `setup: {job_id, state, stages}`; the treatments and the plan are drafted by that **setup job**. Poll `GET /v1/plants/{plant_id}/setup` about once a second and render the newest stage's `message` (written for the owner, verbatim): `opening_treatment` → `treatment_ready` (`data: {courses, steps}`) → `drafting_plan` → `plan_ready` → `done`; a healthy plant skips the two treatment lines, and a plan the model could not write reads `plan_failed` yet still ends `done` (the next revision trigger retries). **`done` is the refetch signal**: only then are `GET /v1/plants/{plant_id}/courses`, the care plan and the new `treatment_step` tasks on `GET /v1/care/today` there to read — a course read straight after the 201 is legitimately empty for a few seconds. 404 `setup_not_found` means a plant with no setup (added before setups existed). No spinner, no retry: open the plant page on the 201 and narrate. The flow is walked step by step in [`frontend-identify-add-flow.md`](frontend-identify-add-flow.md).
 
 ---
 
@@ -242,7 +271,9 @@ abandoned (`409 treatment_not_open`); somebody else's id and an unknown id are t
 treatment_not_found`.
 
 **The care plan** (`CarePlan`): `status`, `revision_id`, `trigger` (`identified | condition_update |
-watering | item_overdue | weather | resumed`), `rationale` (why the plan changed), `latest_insight
+watering | item_overdue | weather | resumed | species_corrected | species_enriched` — the last
+when a species we had just added to the catalogue gets its care card; tolerate a value you do
+not know), `rationale` (why the plan changed), `latest_insight
 {headline, body, tone}`, `items[]` (`kind: watering|treatment|environment|check_in|observe`,
 `title`, `detail`, `cause`, `due_at`, `status: pending|done|skipped|superseded`,
 `source_finding_id`, `replaces_item_id`), `schedule` (the plan's view of the watering/check-in
@@ -308,12 +339,15 @@ POST /v1/plants/{plant_id}/condition-updates
      {photo_id, user_verdict: healthy|concerns|needs_attention, observations?: string[] (≤10 × 160 chars), note?: string (≤1000)}
                                                     → 202 {job_id, update_pending: true}   ← this starts it
 GET  /v1/analysis/{job_id}   (poll ~2 s, allow 3 min) → 200 AnalysisJob with `checkin` when done
+                                                         and `progress[]` growing while it runs
 ```
 
 The two-step shape is deliberate: the owner's own verdict is part of the analysis, so the photo
 waits until it is posted. Errors on the POST: `404 plant_not_found` (not yours), `404 photo_not_found`
 (not yours, not this plant's, or no check-in job for it), `400 photo_wrong_purpose` (an `identify`
 photo), `409 photo_already_used` (already posted; a `failed` job may be re-posted).
+
+**While it runs, narrate it.** Every poll carries `progress[]`, the job's stage lines so far, oldest first, each `{stage, message, at, data?}` with `message` written for the owner and meant to be shown verbatim: `reading_photo`, `scored` (`data: {score, delta}` — the score arrives here first, e.g. "Score updated: 62, down 7"), `reviewing_treatments` (only when the plant has open treatments, naming them), `revising_plan`, then `done` or `failed`. Render the newest message in a one-line strip instead of a bare spinner. An identification job's `progress` is always `[]`.
 
 **When `state == "done"`, read `checkin`:**
 
@@ -421,7 +455,8 @@ waiting out the hour; a plain re-open within the hour is served from cache.
 | GET | `/v1/species/featured` | public | 200 | Plant of the week |
 | GET | `/v1/species/{species_id}` | public | 200 | Species detail |
 | GET | `/v1/plants` | auth | 200 | My plants |
-| POST | `/v1/plants` | auth | 201 | Add a plant `{species_id, photo_id?, nickname?, room?, indoor?}` |
+| POST | `/v1/plants` | auth | 201 | Add a plant `{photo_id, species_id?, nickname?, room?, indoor?}` (`photo_id` required; `species_id` means a correction); answers ~1 s with `setup {job_id, state, stages}` |
+| GET | `/v1/plants/{id}/setup` | auth | 200 | Poll the add's setup job `{job_id, state, stages[]}` until `done`/`failed` |
 | GET | `/v1/plants/{id}` | auth | 200 | Plant detail (with `care_score` and `risk`) |
 | PATCH | `/v1/plants/{id}` | auth | 200 | Edit nickname, room, indoor, visibility, light |
 | POST | `/v1/plants/{id}/species` | auth | 200 | Correct the plant's species `{species_id}` → full Plant |
@@ -444,7 +479,8 @@ waiting out the hour; a plain re-open within the hour is served from cache.
 | POST | `/v1/treatments/{id}/abandon` | auth | 200 | Stop a treatment `{reason, note?}` (404 `treatment_not_found`, 409 `treatment_not_open`) |
 | POST | `/v1/courses/{id}/abandon` | auth | 200 | Stop a whole plan `{reason, note?}` (404 `course_not_found`, 409 `course_not_open`) |
 | POST | `/v1/photos` | auth | 202 | Upload photo (`identify` runs at once; `checkin` waits for the condition update) |
-| GET | `/v1/photos/{photo_id}` | auth | 200 | Photo metadata + signed URLs |
+| GET | `/v1/photos/{photo_id}` | auth | 200 | Photo metadata + URLs (API routes in proxy mode, signed storage links in production) |
+| GET | `/v1/photos/{photo_id}/{variant}` | auth | 200 | The image bytes (`original \| working \| thumb`); what `urls` point at in proxy mode (404 `photo_not_found`) |
 | GET | `/v1/analysis/{job_id}` | auth | 200 | Poll an identification or check-in job |
 | GET | `/v1/insights` | auth | 200 | Daily insights + correlation |
 | GET | `/v1/home` | auth | 200 | Home feed: climate, suggestions, changes, blooming nearby (§6b) |
@@ -457,7 +493,7 @@ waiting out the hour; a plain re-open within the hour is served from cache.
 **Plant** — `id, kind, visibility, species: Species, nickname, room, indoor, added_on,
 health_score: int|null, care_score: int|null, risk: Risk|null,
 health_band: string|null, care_status (`active | stale | paused`), schedule: Schedule,
-history: HealthPoint[] (90 d), care_history: CareEvent[] (last 20), photo_count, streak_weeks,
+history: HealthPoint[] (90 d), care_history: CareEvent[] (last 20), photo_count, cover_photo: {photo_id, thumb, working, captured_at}|null, streak_weeks,
 light_status, light_detail, leaf_drop_reported, needs_attention`
 
 **HealthPoint** — `date, score: int|null, breakdown: object|null, provisional: bool|null,
@@ -511,7 +547,9 @@ water, temperature, humidity, native_range, mature_height, growth_habit, toxicit
 common_issues[], care_tips[], image_url, default_care {watering_interval_days, water_amount_ml,
 check_in_interval_days}, review_status (draft | reviewed)`
 
-**AnalysisJob** — `job_id, photo_id, mode (identify | checkin), state, species|null, confidence|null,
+**AnalysisJob** — `job_id, photo_id, mode (identify | checkin), state, species|null,
+scientific_name|null (what the model called the plant, whether or not we carry it — show this
+when `species` is null), confidence|null,
 rationale|null, alternatives[] {species|null, scientific_name, confidence}, initial_health|null
 {verdict, observations[], severity}, checkin|null (§5), error|null, retryable, created_at, finished_at`
 
@@ -555,19 +593,24 @@ photo_attribution|null, species_id|null`
 |---|---|---|
 | 400 | `otp_invalid`, `otp_expired`, `otp_locked` | show message; `otp_locked` → offer "send a new code" |
 | 400 | `photo_wrong_purpose` | the photo was uploaded as `identify`; re-upload with `purpose=checkin` |
+| 400 | `species_name_unusable` | the identification named nothing (a photo of something that is not a plant); ask the user to pick the species, or to retake the photo |
 | 400 | `invalid_cursor`, `invalid_trait`, `invalid_time`, `oauth_email_required` | programming errors / show message |
 | 401 | `unauthorized`, `invalid_token`, `token_expired` | refresh; if refresh fails → sign in |
 | 401 | `token_reused`, `invalid_credentials`, `oauth_invalid` | sign in again |
 | 403 | `email_unverified` | route to OTP verification |
-| 404 | `plant_not_found`, `species_not_found`, `photo_not_found`, `task_not_found`, `treatment_not_found`, `course_not_found`, `care_plan_not_found`, `not_found` | stale local state → refetch list |
-| 409 | `email_taken`, `account_deleted`, `plant_not_paused`, `plant_not_active`, `treatment_not_open`, `course_not_open`, `photo_already_used`, `conflict` | show message; `photo_already_used` → poll the existing job instead; `plant_not_paused` on a **stale** plant means check in rather than resume |
+| 404 | `plant_not_found`, `species_not_found`, `photo_not_found`, `task_not_found`, `treatment_not_found`, `course_not_found`, `care_plan_not_found`, `setup_not_found`, `not_found` | stale local state → refetch list |
+| 409 | `email_taken`, `account_deleted`, `plant_not_paused`, `plant_not_active`, `treatment_not_open`, `course_not_open`, `photo_already_used`, `photo_already_attached`, `conflict` | show message; `photo_already_used` → poll the existing job instead; `plant_not_paused` on a **stale** plant means check in rather than resume |
+| 409 | `identification_not_ready` | `POST /v1/plants` with a photo whose job has not finished; poll `GET /v1/analysis/{job_id}` and retry |
+| 409 | `photo_not_identification` | that photo was taken for a check-in; a plant starts from a `purpose=identify` photo (this case answered 404 `photo_not_found` before) |
+| 409 | `identification_failed` | `POST /v1/plants` with a photo whose identification failed; do not poll — retake it, or send the species the user picked |
+| 409 | `identification_no_match` | `POST /v1/plants` without `species_id` for a `no_confident_match` job; show the species search and send the pick |
 | 413 | `payload_too_large` | compress / pick another photo |
 | 422 | `validation_error` (`details[]`) | fix the request |
 | 422 | `invalid_timezone` | the tz database has no such zone; send an IANA name |
 | 429 | `rate_limited`, `upload_quota_exceeded`, `analysis_quota_exceeded`, `budget_exhausted` | back off; quotas reset daily (UTC) |
 | 429 | `species_draft_quota_exceeded` | that user has drafted their day's worth of new species; plants we already carry still resolve |
 | 500 | `internal_error` | retry later |
-| 503 | `species_draft_unavailable` | the species could not be drafted now (model or daily budget); offer a retry |
+| 503 | `species_draft_unavailable` | the species could not be added to the catalogue now (the daily budget); offer a retry |
 | job `failed` | `error` on the job, `retryable` | if `retryable`, re-post the condition update / re-upload |
 
 ---

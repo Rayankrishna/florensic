@@ -242,6 +242,24 @@ mixin _$PlantCollectionStore on _PlantCollectionStore, Store {
     });
   }
 
+  late final _$setupsAtom = Atom(
+    name: '_PlantCollectionStore.setups',
+    context: context,
+  );
+
+  @override
+  ObservableMap<String, PlantSetup> get setups {
+    _$setupsAtom.reportRead();
+    return super.setups;
+  }
+
+  @override
+  set setups(ObservableMap<String, PlantSetup> value) {
+    _$setupsAtom.reportWrite(value, super.setups, () {
+      super.setups = value;
+    });
+  }
+
   late final _$loadPlantsAsyncAction = AsyncAction(
     '_PlantCollectionStore.loadPlants',
     context: context,
@@ -418,6 +436,7 @@ searchQuery: ${searchQuery},
 selectedFilter: ${selectedFilter},
 busyPlantId: ${busyPlantId},
 addNeedsSpeciesPick: ${addNeedsSpeciesPick},
+setups: ${setups},
 isLoading: ${isLoading},
 isEmpty: ${isEmpty},
 filteredPlants: ${filteredPlants},

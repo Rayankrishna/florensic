@@ -1,6 +1,6 @@
 # Test server hand-off for the Flutter app
 
-_Written 2026-10-07, updated 2026-10-08. Replaces the ngrok tunnel: the API now runs on a server, so the base URL is
+_Written 2026-10-07, updated 2026-10-19. Replaces the ngrok tunnel: the API now runs on a server, so the base URL is
 fixed and images load without any tunnel._
 
 ## Base URL
@@ -24,11 +24,29 @@ android:usesCleartextTraffic="true"
 and on iOS an `NSAppTransportSecurity` / `NSAllowsArbitraryLoads` exception in `Info.plist` for
 debug builds. Remove both once the server is on HTTPS.
 
+## Sign-in and sign-up screens: remove the demo credentials
+
+The mock build pre-fills a demo account on the sign-in and sign-up screens and never sends the
+form. Against the real backend both must start empty and submit for real:
+
+- **Sign-in**: `POST /v1/auth/sign-in {email, password}` → tokens. Wrong password → `401
+  invalid_credentials`. Keep-me-signed-in keeps the refresh token in secure storage and uses
+  `POST /v1/auth/refresh`.
+- **Sign-up**: `POST /v1/auth/sign-up {name, email, password}` → `202`, then the OTP screen with
+  `POST /v1/auth/otp/verify {email, code}` → tokens. The name and password are sent on sign-up,
+  not on verify. Existing email → `409 email_taken`.
+- **Forgot password**: `POST /v1/auth/otp/request {email, purpose: "reset"}` then
+  `POST /v1/auth/password/reset {email, code, new_password}`.
+- Delete the hardcoded demo email/password constants and any "demo user" profile the locator
+  injects; there is no demo account on the server, and no account survives the reset of
+  2026-10-07.
+
 ## Signing in on the test server
 
-OTP emails are not sent on this server; the code is printed in the API log. Ask the backend for the
-code after you call `POST /v1/auth/otp/request` or sign up, or use the password sign-in once the
-account exists. The database was reset on 2026-10-07, so create a fresh account.
+OTP emails are now REALLY SENT (since 2026-10-19), from `Florensic <alerts@watchit.mydrop.art>`
+— check spam the first time. Sign up with a real inbox you can open; a made-up address gets a
+code nobody can read, because codes no longer appear in the API log. Once the account exists,
+password sign-in works as usual. The database was reset on 2026-10-07, so create a fresh account.
 
 ## Showing a plant's photo
 

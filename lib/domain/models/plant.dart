@@ -3,6 +3,7 @@ import '../core/json.dart';
 import 'plant_care_schedule.dart';
 import 'plant_condition_update.dart';
 import 'plant_health.dart';
+import 'plant_setup.dart';
 import 'plant_species.dart';
 import '../../utils/app_clock.dart';
 
@@ -37,6 +38,7 @@ class Plant {
     this.pending = false,
     this.localPhotoPath,
     this.scanHealth,
+    this.setup,
   });
 
   /// The plant as it stands the moment the keeper adds it, before
@@ -125,6 +127,7 @@ class Plant {
       careScore: Json.intOrNull(json['care_score']),
       risk: Risk.fromJson(json['risk']),
       coverPhoto: CoverPhoto.fromJson(json['cover_photo']),
+      setup: PlantSetup.fromJsonOrNull(json['setup']),
     );
   }
 
@@ -190,6 +193,11 @@ class Plant {
   /// The identification's health read; only a draft carries it.
   final InitialHealth? scanHealth;
 
+  /// The setup job behind the add, as the create response handed it over.
+  /// Only the plant that `POST /v1/plants` returned carries it; the
+  /// collection follows the job from there.
+  final PlantSetup? setup;
+
   /// The saved plant, keeping this draft's on-device photo.
   Plant confirmedAs(Plant saved) => Plant(
         id: saved.id,
@@ -215,6 +223,7 @@ class Plant {
         risk: saved.risk,
         coverPhoto: saved.coverPhoto,
         localPhotoPath: localPhotoPath,
+        setup: saved.setup,
       );
 
   String get latinName => species.latinName;
@@ -357,6 +366,7 @@ class Plant {
       pending: pending,
       localPhotoPath: localPhotoPath,
       scanHealth: scanHealth,
+      setup: setup,
     );
   }
 }

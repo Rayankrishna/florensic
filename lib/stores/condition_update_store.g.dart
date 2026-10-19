@@ -251,6 +251,24 @@ mixin _$ConditionUpdateStore on _ConditionUpdateStore, Store {
     });
   }
 
+  late final _$progressMessageAtom = Atom(
+    name: '_ConditionUpdateStore.progressMessage',
+    context: context,
+  );
+
+  @override
+  String? get progressMessage {
+    _$progressMessageAtom.reportRead();
+    return super.progressMessage;
+  }
+
+  @override
+  set progressMessage(String? value) {
+    _$progressMessageAtom.reportWrite(value, super.progressMessage, () {
+      super.progressMessage = value;
+    });
+  }
+
   late final _$errorMessageAtom = Atom(
     name: '_ConditionUpdateStore.errorMessage',
     context: context,
@@ -526,6 +544,7 @@ verdict: ${verdict},
 observations: ${observations},
 note: ${note},
 isSaving: ${isSaving},
+progressMessage: ${progressMessage},
 errorMessage: ${errorMessage},
 newScore: ${newScore},
 scoreDelta: ${scoreDelta},

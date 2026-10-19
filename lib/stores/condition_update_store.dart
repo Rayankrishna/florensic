@@ -63,6 +63,12 @@ abstract class _ConditionUpdateStore with Store {
   @observable
   bool isSaving = false;
 
+  /// The newest line the analysis job has written while [isSaving] — the
+  /// server narrates a check-in (reading the photo, the new score,
+  /// treatments under review, the plan) and the message is shown verbatim.
+  @observable
+  String? progressMessage;
+
   @observable
   String? errorMessage;
 
@@ -296,6 +302,7 @@ abstract class _ConditionUpdateStore with Store {
     final v = verdict ?? ConditionVerdict.healthy;
     isSaving = true;
     errorMessage = null;
+    progressMessage = null;
 
     CheckInResult result;
     try {
@@ -304,6 +311,8 @@ abstract class _ConditionUpdateStore with Store {
         verdict: v,
         observations: observations.toList(),
         note: note,
+        onProgress: (stage) =>
+            runInAction(() => progressMessage = stage.message),
       );
     } on ApiException catch (e) {
       AppLog.e('saving the check-in failed', name: 'checkin', error: e);
