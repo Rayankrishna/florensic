@@ -49,6 +49,10 @@ abstract class _PlantDetailStore with Store {
   @computed
   bool get isLoading => state == LoadState.loading;
 
+  /// A plant still being saved: only what the scan saw is known yet.
+  @computed
+  bool get isPending => plant?.pending ?? false;
+
   @computed
   int? get healthScore => plant?.healthScore;
 
@@ -451,6 +455,31 @@ abstract class _PlantDetailStore with Store {
     photosLoaded = false;
   }
 
+  /// True when the draft's add failed because the scan could not name the
+  /// plant, so the way forward is to pick the species.
+  @observable
+  bool draftNeedsSpeciesPick = false;
+
+  /// Waits for a draft to be saved, then loads what only the saved plant
+  /// has. False when the add failed and the draft is gone.
+  @action
+  Future<bool> settleDraft() async {
+    final p = plant;
+    if (p == null || !p.pending) return true;
+    final saved = await _collection.whenAdded(p.id);
+    if (saved == null) {
+      runInAction(() {
+        errorMessage =
+            _collection.errorMessage ?? 'We could not add this plant.';
+        draftNeedsSpeciesPick = _collection.addNeedsSpeciesPick;
+      });
+      return false;
+    }
+    runInAction(() => plant = saved);
+    await Future.wait([loadCourses(), loadPhotos()]);
+    return true;
+  }
+
   /// Picks up a write made elsewhere (a check-in replaces the collection's
   /// copy, not this one) and the photo it may have added.
   @action
@@ -465,7 +494,8 @@ abstract class _PlantDetailStore with Store {
   @action
   Future<void> loadPhotos() async {
     final p = plant;
-    if (p == null) return;
+    // A draft has no server id to ask with yet.
+    if (p == null || p.pending) return;
     try {
       final list = await _repository.loadPhotos(p.id);
       runInAction(() {
@@ -482,7 +512,8 @@ abstract class _PlantDetailStore with Store {
   @action
   Future<void> loadCourses() async {
     final p = plant;
-    if (p == null) return;
+    // A draft has no server id to ask with yet.
+    if (p == null || p.pending) return;
     try {
       final list = await _repository.loadCourses(p.id);
       runInAction(() {

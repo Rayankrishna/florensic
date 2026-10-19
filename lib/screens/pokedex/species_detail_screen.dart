@@ -4,9 +4,7 @@ import 'package:flutter/services.dart';
 import '../../domain/models/plant_species.dart';
 import '../../enum.dart';
 import '../../key.dart';
-import '../../locator.dart';
 import '../../routes.dart';
-import '../../shared/components/add_plant_sheet.dart';
 import '../../shared/components/app_button.dart';
 import '../../shared/components/app_chip.dart';
 import '../../shared/components/app_surfaces.dart';
@@ -16,7 +14,6 @@ import '../../shared/components/list_rows.dart';
 import '../../shared/widgets/pg_icon.dart';
 import '../../shared/widgets/auth_image.dart';
 import '../../shared/widgets/plant_artwork.dart';
-import '../../stores/plant_collection_store.dart';
 import '../../theme.dart';
 
 /// A Pokedex entry: the reference record for one species.
@@ -30,29 +27,6 @@ class SpeciesDetailScreen extends StatefulWidget {
 }
 
 class _SpeciesDetailScreenState extends State<SpeciesDetailScreen> {
-  bool _adding = false;
-
-  Future<void> _add() async {
-    final nickname = await AddPlantSheet.show(context, widget.species);
-    if (nickname == null || !mounted) return;
-
-    setState(() => _adding = true);
-    final plant = await locator<PlantCollectionStore>()
-        .addPlant(widget.species, nickname: nickname);
-    if (!mounted) return;
-    setState(() => _adding = false);
-    if (plant == null) return;
-    HapticFeedback.mediumImpact();
-    AppToast.show(
-      context,
-      message: '${plant.nickname} added to your collection',
-      detail: 'Care schedule starts tomorrow',
-      actionLabel: 'View',
-      onAction: () => Navigator.of(context)
-          .pushNamed(AppRoutes.plantDetail, arguments: plant),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final s = widget.species;
@@ -319,26 +293,14 @@ class _SpeciesDetailScreenState extends State<SpeciesDetailScreen> {
                     stops: [0, 0.45, 1],
                   ),
                 ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: AppButton.primary(
-                        label: 'Add to My Plants',
-                        loading: _adding,
-                        onPressed: _add,
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.md),
-                    CircleIconButton(
-                      icon: PgIcons.scan,
-                      size: 58,
-                      background: AppColors.ink,
-                      foreground: AppColors.leaf,
-                      onPressed: () =>
-                          Navigator.of(context).pushNamed(AppRoutes.scan),
-                      semanticLabel: 'Identify a plant',
-                    ),
-                  ],
+                // A plant starts from an identification photo — its score,
+                // findings and cover all come from it — so there is no add
+                // without a scan.
+                child: AppButton.primary(
+                  label: 'Scan to add to My Plants',
+                  icon: PgIcons.scan,
+                  onPressed: () =>
+                      Navigator.of(context).pushNamed(AppRoutes.scan),
                 ),
               ),
             ),

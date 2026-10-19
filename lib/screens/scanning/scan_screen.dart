@@ -171,8 +171,11 @@ class _ScanScreenState extends State<ScanScreen> {
                               const SizedBox(height: AppSpacing.md),
                             ],
                             Text(
-                              'Fill the frame with one healthy leaf in even '
-                              'light — that gives the cleanest match.',
+                              busy
+                                  ? 'Usually about five seconds.'
+                                  : 'Fill the frame with one healthy leaf in '
+                                      'even light — that gives the cleanest '
+                                      'match.',
                               textAlign: TextAlign.center,
                               style: AppText.body15.copyWith(
                                 fontSize: 15,

@@ -66,6 +66,36 @@ class PlantSpecies {
     );
   }
 
+  /// A plant the catalogue does not carry yet: the identification named it
+  /// but there is no entry to link to. The server creates the entry itself
+  /// when the plant is kept, so [id] is empty until then. A species the
+  /// correction search just drafted comes back the same way with its [id]
+  /// set and its care-card fields still empty.
+  factory PlantSpecies.unlisted(String scientificName, {String id = ''}) {
+    final name = scientificName.trim();
+    return PlantSpecies(
+      id: id,
+      number: 0,
+      commonName: name.isEmpty ? 'Unknown plant' : name,
+      latinName: name,
+      glyph: SpeciesArtwork.glyphFor(name),
+      ground: SpeciesArtwork.groundFor(name),
+      summary: '',
+      difficulty: '',
+      light: '',
+      water: '',
+      temperature: '',
+      humidity: '',
+      nativeRange: '',
+      matureHeight: '',
+      growthHabit: '',
+      tags: const [],
+      traits: const {},
+      commonIssues: const [],
+      careTips: const [],
+    );
+  }
+
   static PokedexFilter? _traitFrom(String raw) => switch (raw) {
         'indoor' => PokedexFilter.indoor,
         'low_light' => PokedexFilter.lowLight,
@@ -115,9 +145,13 @@ class PlantSpecies {
   /// Server-supplied cadence, preferred over parsing [water].
   final int? defaultWateringDays;
 
+  /// False for an [unlisted] species, which has no catalogue page yet.
+  bool get isListed => id.isNotEmpty;
+
   /// Compact chips on the grid card: difficulty + a light hint.
   String get shortLight {
     final word = light.split(' ').last;
+    if (word.isEmpty) return '';
     return word[0].toUpperCase() + word.substring(1);
   }
 

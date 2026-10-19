@@ -20,6 +20,10 @@ live on the test server at `http://13.202.212.73:8012` — a fixed address now, 
 
 | Where | Before | Now | What to change in the app |
 |---|---|---|---|
+| `POST /v1/plants` body | `{species_id, photo_id?, …}` — the species required, the photo optional | `{photo_id, species_id?, …}` — **the photo required, the species optional**. Omit `species_id` and the plant is kept as whatever the photo's identification found; send it and it wins, which is the correction path | Remove any "add without a photo" path. Keep the photo you uploaded for identification and send its `photo_id`; send `species_id` only when the user picked a different species |
+| identification, `species` on `done` | always a full `Species`, or the job was `no_confident_match` | **may be `null`** for a plant we do not carry yet. The job is still `done` and the new top-level `scientific_name` carries what the model called it | Make `species` nullable on `AnalysisJob`; show `scientific_name` when it is null, and link to the species page only when it is not |
+| `POST /v1/plants` with the owner's own **check-in** photo | `404 photo_not_found` | **`409 photo_not_identification`**. Somebody else's photo, or one that does not exist, is still 404 | If you matched 404 here to mean "pick another photo", match the 409 instead |
+| identification, `no_confident_match` | returned when confidence < 40 | **not returned** — the threshold ships at `0`, so every finished identification is `done` | Keep the branch (one env value brings it back), but do not rely on it to decide when to offer the correction search |
 | `health_score`, clean check-in | about 70, drifting with adherence | **90**. 100 only for a clean photo that also improved and put out new growth | Drop any hard-coded "healthy is 70" copy or threshold. A plant that used to sit near 70 now sits near 90 |
 | `health_score`, plant kept without a photo | `80` | `null` (nothing has scored it) | Render "not scored yet", not a 0 or an 80 |
 | `health_score`, plant kept from a photo | `80` | the identification's own reading: 90 less what its findings cost | Nothing to change beyond trusting the number |
@@ -254,6 +258,11 @@ New since the guides you worked from:
 | HTTP | `error.code` | When | App reaction |
 |---|---|---|---|
 | 400 | `task_not_skippable` | `/skip` on anything but a `treatment_step` | offer skip only on that kind |
+| 400 | `species_name_unusable` | `POST /v1/plants` with a photo whose identification named nothing (not a plant) | ask the user to pick the species or retake the photo |
+| 409 | `identification_not_ready` | `POST /v1/plants` with a photo whose job has not finished | poll `GET /v1/analysis/{job_id}` and retry |
+| 409 | `photo_not_identification` | `POST /v1/plants` with a check-in photo (**was 404 `photo_not_found`**, see §2) | a plant starts from a `purpose=identify` photo |
+| 409 | `identification_failed` | `POST /v1/plants` with a photo whose identification job **failed** | do not poll — retake the photo, or let the user pick the species and send `species_id` |
+| 409 | `identification_no_match` | `POST /v1/plants` without `species_id`, for a job that ended `no_confident_match` | show the species search and send the picked `species_id` |
 | 403 | `admin_only` | `GET /v1/admin/metrics/problems` without an admin account | not reachable from this app |
 | 404 | `treatment_not_found` | unknown id, or somebody else's | refetch the treatments list |
 | 404 | `course_not_found` | unknown course id, or somebody else's | refetch `GET /v1/plants/{id}/courses` |
@@ -280,6 +289,11 @@ documented in §4 and §7 of the API guide rather than in its §9 table.
 
 ## 8. Checklist
 
+- [ ] Make `photo_id` required and `species_id` optional on the add-a-plant call, and delete any "add without a photo" flow; `species_id` is now only sent when the user corrected the identification.
+- [ ] Make `AnalysisJob.species` nullable and add `scientific_name`; show the name when there is no species row, and offer the correction search on any `done` job rather than only on `no_confident_match`.
+- [ ] Handle `identification_not_ready` (409, poll and retry), `identification_failed` (409, retake or pick), `identification_no_match` (409, pick), `photo_not_identification` (409, was 404) and `species_name_unusable` (400) on the add call.
+- [ ] Widen `CarePlan.trigger` with `species_corrected` and `species_enriched`, with an unknown fallback.
+- [ ] Stop showing a 10-second spinner on `POST /v1/species/resolve`; it now answers in under a second, and the species it hands back may have empty care-card fields until a background pass fills them in.
 - [ ] Send `PATCH /v1/me {timezone}` with the device zone right after the first token exchange, and whenever it differs from `Me.timezone`.
 - [ ] Add `timezone` to `UserProfile` / `Me` (required, IANA string).
 - [ ] Add `coverPhoto` (nullable: `photoId`, `thumb`, `working`, `capturedAt`) to `Plant` and render it on the card and grid.

@@ -30,6 +30,23 @@ class ApiException implements Exception {
 
   bool get isTaskNotSkippable => code == 'task_not_skippable';
 
+  /// `POST /v1/plants` before the photo's identification finished.
+  bool get isIdentificationNotReady => code == 'identification_not_ready';
+
+  /// The add cannot go through as the scan named it — the identification
+  /// failed, found no match, or named nothing. Pick the species or retake.
+  bool get needsSpeciesPick =>
+      code == 'identification_failed' ||
+      code == 'identification_no_match' ||
+      code == 'species_name_unusable';
+
+  /// A check-in photo was sent to the add. This is a 409 now; it used to be
+  /// `404 photo_not_found`, which still means someone else's photo or none.
+  bool get isPhotoNotIdentification => code == 'photo_not_identification';
+
+  /// That photo already made a plant.
+  bool get isPhotoAlreadyUsed => code == 'photo_already_used';
+
   bool get isInvalidTimezone => code == 'invalid_timezone';
 
   @override

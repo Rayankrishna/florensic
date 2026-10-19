@@ -20,6 +20,7 @@ class AnalysisJob {
     required this.photoId,
     required this.state,
     this.species,
+    this.scientificName = '',
     this.confidence,
     this.rationale,
     this.alternatives = const [],
@@ -38,6 +39,7 @@ class AnalysisJob {
       state: Json.str(json['state'], 'queued'),
       species:
           speciesJson.isEmpty ? null : PlantSpecies.fromJson(speciesJson),
+      scientificName: Json.str(json['scientific_name']),
       confidence: Json.intOrNull(json['confidence']),
       rationale: Json.str(json['rationale']),
       alternatives: Json.list(json['alternatives'])
@@ -57,9 +59,19 @@ class AnalysisJob {
   final String jobId;
   final String photoId;
 
-  /// `queued | running | done | no_confident_match | failed`.
+  /// `queued | running | done | failed`. `no_confident_match` is switched
+  /// off server-side (the threshold ships at 0) but stays a known state: one
+  /// env value brings it back.
   final String state;
+
+  /// The catalogue card when we carry the plant; null on a finished
+  /// identification means a plant the catalogue does not have yet — not a
+  /// failure. [scientificName] still names it.
   final PlantSpecies? species;
+
+  /// What the model called the plant. Always present on a finished
+  /// identification, with or without a catalogue row.
+  final String scientificName;
   final int? confidence;
   final String? rationale;
   final List<AnalysisAlternative> alternatives;
@@ -213,11 +225,12 @@ class PhotosProvider {
 
   /// Polls until the job reaches a terminal state.
   ///
-  /// Identification takes 10–60 s and a check-in 10–40 s, so the ceiling is
-  /// generous; [onTick] lets the UI keep its scanning state honest.
+  /// Identification takes about 5 s (nothing finishes under ~3 s) and a
+  /// check-in 10–40 s; the ceiling is generous for the slow one. [onTick]
+  /// lets the UI keep its scanning state honest.
   Future<AnalysisJob> awaitJob(
     String jobId, {
-    Duration interval = const Duration(seconds: 2),
+    Duration interval = const Duration(seconds: 1),
     Duration timeout = const Duration(minutes: 3),
     void Function(AnalysisJob job)? onTick,
   }) async {

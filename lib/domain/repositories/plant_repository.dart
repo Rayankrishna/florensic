@@ -3,7 +3,6 @@ import '../models/care_task.dart';
 import '../models/plant.dart';
 import '../models/plant_condition_update.dart';
 import '../models/plant_photo.dart';
-import '../models/plant_species.dart';
 import '../models/treatment.dart';
 
 /// The keeper's collection.
@@ -50,11 +49,14 @@ abstract class PlantRepository {
   Future<Course> abandonCourse(String courseId, AbandonReason reason,
       {String? note});
 
-  /// Adds [species] to the collection. [nickname] is what the keeper calls
-  /// this particular plant; blank falls back to the species' common name.
-  /// [photoId] is the identification photo, kept as the plant's first.
-  Future<Plant> addPlant(PlantSpecies species,
-      {String? nickname, String? photoId});
+  /// Keeps a plant from its identification photo, which is required: the
+  /// score, findings and cover come from it. [speciesId] goes only when the
+  /// keeper corrected the identification.
+  Future<Plant> addPlant({
+    required String photoId,
+    String? speciesId,
+    String? nickname,
+  });
 
   Future<void> removePlant(String plantId);
 

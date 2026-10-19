@@ -16,6 +16,13 @@ mixin _$PlantDetailStore on _PlantDetailStore, Store {
     () => super.isLoading,
     name: '_PlantDetailStore.isLoading',
   )).value;
+  Computed<bool>? _$isPendingComputed;
+
+  @override
+  bool get isPending => (_$isPendingComputed ??= Computed<bool>(
+    () => super.isPending,
+    name: '_PlantDetailStore.isPending',
+  )).value;
   Computed<int?>? _$healthScoreComputed;
 
   @override
@@ -418,6 +425,28 @@ mixin _$PlantDetailStore on _PlantDetailStore, Store {
     });
   }
 
+  late final _$draftNeedsSpeciesPickAtom = Atom(
+    name: '_PlantDetailStore.draftNeedsSpeciesPick',
+    context: context,
+  );
+
+  @override
+  bool get draftNeedsSpeciesPick {
+    _$draftNeedsSpeciesPickAtom.reportRead();
+    return super.draftNeedsSpeciesPick;
+  }
+
+  @override
+  set draftNeedsSpeciesPick(bool value) {
+    _$draftNeedsSpeciesPickAtom.reportWrite(
+      value,
+      super.draftNeedsSpeciesPick,
+      () {
+        super.draftNeedsSpeciesPick = value;
+      },
+    );
+  }
+
   late final _$loadPlantDetailsAsyncAction = AsyncAction(
     '_PlantDetailStore.loadPlantDetails',
     context: context,
@@ -428,6 +457,16 @@ mixin _$PlantDetailStore on _PlantDetailStore, Store {
     return _$loadPlantDetailsAsyncAction.run(
       () => super.loadPlantDetails(plantId),
     );
+  }
+
+  late final _$settleDraftAsyncAction = AsyncAction(
+    '_PlantDetailStore.settleDraft',
+    context: context,
+  );
+
+  @override
+  Future<bool> settleDraft() {
+    return _$settleDraftAsyncAction.run(() => super.settleDraft());
   }
 
   late final _$refreshAfterCheckInAsyncAction = AsyncAction(
@@ -614,7 +653,9 @@ photos: ${photos},
 photosLoaded: ${photosLoaded},
 environmentDetail: ${environmentDetail},
 environmentStatus: ${environmentStatus},
+draftNeedsSpeciesPick: ${draftNeedsSpeciesPick},
 isLoading: ${isLoading},
+isPending: ${isPending},
 healthScore: ${healthScore},
 band: ${band},
 careStatus: ${careStatus},

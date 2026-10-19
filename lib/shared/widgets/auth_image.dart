@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../../domain/core/services_config.dart';
@@ -83,25 +85,42 @@ class _AuthImageState extends State<AuthImage> {
 
 /// A photo when there is a link, the drawn artwork otherwise — the one-line
 /// form for a card, tile or hero that has both a picture and a glyph.
+///
+/// [localPath] is a copy of the photo on this device (a plant just added
+/// from a scan). It shows straight away, and stays up while [url] loads or
+/// when it cannot be shown.
 class PhotoOrArtwork extends StatelessWidget {
   const PhotoOrArtwork({
     super.key,
     required this.url,
     required this.artwork,
+    this.localPath,
     this.fit = BoxFit.cover,
     this.alignment = Alignment.center,
   });
 
-  /// `null` or empty draws [artwork] alone.
+  /// `null` or empty draws [localPath], or [artwork] alone.
   final String? url;
   final Widget artwork;
+  final String? localPath;
   final BoxFit fit;
   final Alignment alignment;
 
   @override
   Widget build(BuildContext context) {
+    final local = localPath;
+    final fallback = local == null || local.isEmpty
+        ? artwork
+        : Image.file(
+            File(local),
+            fit: fit,
+            alignment: alignment,
+            gaplessPlayback: true,
+            errorBuilder: (context, error, stackTrace) => artwork,
+          );
     final link = url;
-    if (link == null || link.isEmpty) return artwork;
-    return AuthImage(url: link, fallback: artwork, fit: fit, alignment: alignment);
+    if (link == null || link.isEmpty) return fallback;
+    return AuthImage(
+        url: link, fallback: fallback, fit: fit, alignment: alignment);
   }
 }

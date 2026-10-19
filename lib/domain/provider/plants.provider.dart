@@ -23,9 +23,14 @@ class PlantsProvider {
 
   Future<Plant> byId(String id) => _http.get('/plants/$id', _plant);
 
+  /// `photo_id` is the identification photo and is required: the plant's
+  /// score, findings and cover all come from it. `species_id` goes only when
+  /// the keeper picked a different species — that is the correction, and it
+  /// wins. Left out, the plant is kept as whatever the photo's own
+  /// identification found, catalogue entry or not.
   Future<Plant> create({
-    required String speciesId,
-    String? photoId,
+    required String photoId,
+    String? speciesId,
     String? nickname,
     String? room,
     bool? indoor,
@@ -34,8 +39,8 @@ class PlantsProvider {
         '/plants',
         _plant,
         body: {
-          'species_id': speciesId,
-          'photo_id': ?photoId,
+          'photo_id': photoId,
+          'species_id': ?speciesId,
           if (nickname != null && nickname.isNotEmpty) 'nickname': nickname,
           'room': ?room,
           'indoor': ?indoor,

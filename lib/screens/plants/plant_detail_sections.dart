@@ -45,6 +45,7 @@ class PlantPhotoCard extends StatelessWidget {
             children: [
               PhotoOrArtwork(
                 url: cover?.working,
+                localPath: plant.localPhotoPath,
                 artwork: PlantArtwork(
                   glyph: plant.species.glyph,
                   ground: plant.species.ground,
@@ -307,6 +308,101 @@ class UnscoredHealthCard extends StatelessWidget {
             height: 50,
             fontSize: 15,
             onPressed: onUpdate,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A plant still being saved. Shows what the identification photo already
+/// said about its health while the server scores it and drafts the first
+/// care plan; the full dashboard replaces it once the plant lands.
+class DraftHealthCard extends StatelessWidget {
+  const DraftHealthCard({super.key, required this.health});
+
+  /// Null when the scan gave no health read.
+  final InitialHealth? health;
+
+  @override
+  Widget build(BuildContext context) {
+    final read = health;
+    return AppCard(
+      padding: const EdgeInsets.all(AppSpacing.cardPaddingLarge),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (read != null) ...[
+            Row(
+              children: [
+                IconTile(
+                  icon: switch (read.verdict) {
+                    ConditionVerdict.healthy => PgIcons.check,
+                    ConditionVerdict.concerns => PgIcons.alertTriangle,
+                    ConditionVerdict.needsAttention => PgIcons.alertCircle,
+                  },
+                  tone: switch (read.verdict) {
+                    ConditionVerdict.healthy => MetricStatus.good,
+                    ConditionVerdict.concerns => MetricStatus.watch,
+                    ConditionVerdict.needsAttention => MetricStatus.bad,
+                  },
+                ),
+                const SizedBox(width: AppSpacing.lg),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(read.verdict.title,
+                          style: AppText.heading17.copyWith(fontSize: 17)),
+                      const SizedBox(height: 2),
+                      Text('From the photo you scanned',
+                          style: AppText.body13.copyWith(fontSize: 13)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (read.observations.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.lg),
+              for (final note in read.observations)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.only(top: 3),
+                        child: PgIcon(PgIcons.leaf,
+                            size: 16, color: AppColors.inkMuted),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Text(note,
+                            style: AppText.body15.copyWith(fontSize: 15)),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+            const SizedBox(height: AppSpacing.lg),
+          ],
+          Row(
+            children: [
+              const SizedBox.square(
+                dimension: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.2,
+                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.leaf),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Text(
+                  'Working out its health score and care plan…',
+                  style: AppText.body13.copyWith(fontSize: 13),
+                ),
+              ),
+            ],
           ),
         ],
       ),

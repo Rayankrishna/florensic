@@ -20,6 +20,7 @@ import 'screens/pokedex/pokedex_screen.dart';
 import 'screens/pokedex/species_detail_screen.dart';
 import 'screens/scanning/scan_result_screen.dart';
 import 'screens/scanning/scan_screen.dart';
+import 'screens/scanning/species_search_screen.dart';
 import 'screens/shell/app_shell.dart';
 import 'screens/splash/splash_screen.dart';
 import 'stores/condition_update_store.dart';
@@ -52,6 +53,7 @@ class AppRoutes {
   static const String speciesDetail = '/pokedex/species';
   static const String scan = '/scan';
   static const String scanResult = '/scan/result';
+  static const String speciesSearch = '/scan/species';
   static const String notifications = '/notifications';
   static const String insights = '/insights';
 
@@ -137,6 +139,9 @@ class AppRoutes {
 
       case scanResult:
         return AppTransitions.glide(const ScanResultScreen(), settings);
+
+      case speciesSearch:
+        return AppTransitions.rise(const SpeciesSearchScreen(), settings);
 
       case notifications:
         return AppTransitions.glide(const NotificationsScreen(), settings);

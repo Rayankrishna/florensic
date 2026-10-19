@@ -125,24 +125,6 @@ mixin _$ScanningStore on _ScanningStore, Store {
     });
   }
 
-  late final _$isAddingAtom = Atom(
-    name: '_ScanningStore.isAdding',
-    context: context,
-  );
-
-  @override
-  bool get isAdding {
-    _$isAddingAtom.reportRead();
-    return super.isAdding;
-  }
-
-  @override
-  set isAdding(bool value) {
-    _$isAddingAtom.reportWrite(value, super.isAdding, () {
-      super.isAdding = value;
-    });
-  }
-
   late final _$captureAtom = Atom(
     name: '_ScanningStore.capture',
     context: context,
@@ -197,6 +179,116 @@ mixin _$ScanningStore on _ScanningStore, Store {
     });
   }
 
+  late final _$suggestionQueryAtom = Atom(
+    name: '_ScanningStore.suggestionQuery',
+    context: context,
+  );
+
+  @override
+  String get suggestionQuery {
+    _$suggestionQueryAtom.reportRead();
+    return super.suggestionQuery;
+  }
+
+  @override
+  set suggestionQuery(String value) {
+    _$suggestionQueryAtom.reportWrite(value, super.suggestionQuery, () {
+      super.suggestionQuery = value;
+    });
+  }
+
+  late final _$suggestionsAtom = Atom(
+    name: '_ScanningStore.suggestions',
+    context: context,
+  );
+
+  @override
+  ObservableList<SpeciesSuggestion> get suggestions {
+    _$suggestionsAtom.reportRead();
+    return super.suggestions;
+  }
+
+  @override
+  set suggestions(ObservableList<SpeciesSuggestion> value) {
+    _$suggestionsAtom.reportWrite(value, super.suggestions, () {
+      super.suggestions = value;
+    });
+  }
+
+  late final _$isSuggestingAtom = Atom(
+    name: '_ScanningStore.isSuggesting',
+    context: context,
+  );
+
+  @override
+  bool get isSuggesting {
+    _$isSuggestingAtom.reportRead();
+    return super.isSuggesting;
+  }
+
+  @override
+  set isSuggesting(bool value) {
+    _$isSuggestingAtom.reportWrite(value, super.isSuggesting, () {
+      super.isSuggesting = value;
+    });
+  }
+
+  late final _$isCorrectingAtom = Atom(
+    name: '_ScanningStore.isCorrecting',
+    context: context,
+  );
+
+  @override
+  bool get isCorrecting {
+    _$isCorrectingAtom.reportRead();
+    return super.isCorrecting;
+  }
+
+  @override
+  set isCorrecting(bool value) {
+    _$isCorrectingAtom.reportWrite(value, super.isCorrecting, () {
+      super.isCorrecting = value;
+    });
+  }
+
+  late final _$correctionErrorAtom = Atom(
+    name: '_ScanningStore.correctionError',
+    context: context,
+  );
+
+  @override
+  String? get correctionError {
+    _$correctionErrorAtom.reportRead();
+    return super.correctionError;
+  }
+
+  @override
+  set correctionError(String? value) {
+    _$correctionErrorAtom.reportWrite(value, super.correctionError, () {
+      super.correctionError = value;
+    });
+  }
+
+  late final _$suggestSpeciesAsyncAction = AsyncAction(
+    '_ScanningStore.suggestSpecies',
+    context: context,
+  );
+
+  @override
+  Future<void> suggestSpecies(String query) {
+    return _$suggestSpeciesAsyncAction.run(() => super.suggestSpecies(query));
+  }
+
+  late final _$correctSpeciesAsyncAction = AsyncAction(
+    '_ScanningStore.correctSpecies',
+    context: context,
+  );
+
+  @override
+  Future<bool> correctSpecies(SpeciesSuggestion pick) {
+    return _$correctSpeciesAsyncAction.run(() => super.correctSpecies(pick));
+  }
+
   late final _$scanPlantAsyncAction = AsyncAction(
     '_ScanningStore.scanPlant',
     context: context,
@@ -249,18 +341,6 @@ mixin _$ScanningStore on _ScanningStore, Store {
     return _$_identifyAsyncAction.run(() => super._identify());
   }
 
-  late final _$addToCollectionAsyncAction = AsyncAction(
-    '_ScanningStore.addToCollection',
-    context: context,
-  );
-
-  @override
-  Future<Plant?> addToCollection({String? nickname}) {
-    return _$addToCollectionAsyncAction.run(
-      () => super.addToCollection(nickname: nickname),
-    );
-  }
-
   late final _$_ScanningStoreActionController = ActionController(
     name: '_ScanningStore',
     context: context,
@@ -291,6 +371,42 @@ mixin _$ScanningStore on _ScanningStore, Store {
   }
 
   @override
+  void clearSuggestions() {
+    final _$actionInfo = _$_ScanningStoreActionController.startAction(
+      name: '_ScanningStore.clearSuggestions',
+    );
+    try {
+      return super.clearSuggestions();
+    } finally {
+      _$_ScanningStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void useAlternative(IdentificationAlternative alt) {
+    final _$actionInfo = _$_ScanningStoreActionController.startAction(
+      name: '_ScanningStore.useAlternative',
+    );
+    try {
+      return super.useAlternative(alt);
+    } finally {
+      _$_ScanningStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void revertCorrection() {
+    final _$actionInfo = _$_ScanningStoreActionController.startAction(
+      name: '_ScanningStore.revertCorrection',
+    );
+    try {
+      return super.revertCorrection();
+    } finally {
+      _$_ScanningStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
   Future<void> openSettings() {
     final _$actionInfo = _$_ScanningStoreActionController.startAction(
       name: '_ScanningStore.openSettings',
@@ -303,16 +419,32 @@ mixin _$ScanningStore on _ScanningStore, Store {
   }
 
   @override
+  Plant? addToCollection({String? nickname}) {
+    final _$actionInfo = _$_ScanningStoreActionController.startAction(
+      name: '_ScanningStore.addToCollection',
+    );
+    try {
+      return super.addToCollection(nickname: nickname);
+    } finally {
+      _$_ScanningStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
   String toString() {
     return '''
 status: ${status},
 target: ${target},
 result: ${result},
 errorMessage: ${errorMessage},
-isAdding: ${isAdding},
 capture: ${capture},
 isCapturing: ${isCapturing},
 needsSettings: ${needsSettings},
+suggestionQuery: ${suggestionQuery},
+suggestions: ${suggestions},
+isSuggesting: ${isSuggesting},
+isCorrecting: ${isCorrecting},
+correctionError: ${correctionError},
 isScanning: ${isScanning},
 hasMatch: ${hasMatch},
 confidence: ${confidence},

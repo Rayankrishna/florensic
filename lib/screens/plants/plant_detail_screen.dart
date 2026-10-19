@@ -51,8 +51,36 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
         insights.environmentStatus,
       );
     }
-    _store.loadCourses();
-    _store.loadPhotos();
+    if (_store.isPending) {
+      _settleDraft();
+    } else {
+      _store.loadCourses();
+      _store.loadPhotos();
+    }
+  }
+
+  /// A just-added plant opens before the server has it; the dashboard fills
+  /// in when the save lands. If it fails, the plant is gone — say so and
+  /// leave.
+  Future<void> _settleDraft() async {
+    final saved = await _store.settleDraft();
+    if (saved || !mounted) return;
+    final navigator = Navigator.of(context);
+    final pick = _store.draftNeedsSpeciesPick;
+    AppToast.show(
+      context,
+      message: "Couldn't add ${widget.plant.nickname}",
+      detail: _store.errorMessage,
+      // The scan result is still there to correct: back to it, with the
+      // species search on top.
+      actionLabel: pick ? 'Pick species' : null,
+      onAction: pick
+          ? () => navigator
+            ..pushNamed(AppRoutes.scanResult)
+            ..pushNamed(AppRoutes.speciesSearch)
+          : null,
+    );
+    navigator.maybePop();
   }
 
   Future<void> _water() async {
@@ -147,11 +175,14 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                               title: plant.nickname,
                               subtitle: plant.latinName,
                               onBack: () => Navigator.of(context).maybePop(),
-                              trailing: CircleIconButton(
-                                icon: PgIcons.dots,
-                                onPressed: () => _showMenu(context, plant),
-                                semanticLabel: 'Plant options',
-                              ),
+                              trailing: plant.pending
+                                  ? null
+                                  : CircleIconButton(
+                                      icon: PgIcons.dots,
+                                      onPressed: () =>
+                                          _showMenu(context, plant),
+                                      semanticLabel: 'Plant options',
+                                    ),
                             ),
                           ),
                         ),
@@ -168,7 +199,9 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                               const SizedBox(height: AppSpacing.lg),
                               // Branch on care status for paused; a null
                               // score means never scored, not paused.
-                              if (_store.isPaused)
+                              if (plant.pending)
+                                DraftHealthCard(health: plant.scanHealth)
+                              else if (_store.isPaused)
                                 PausedHealthCard(plant: plant)
                               else if (!_store.isScored)
                                 UnscoredHealthCard(
@@ -190,7 +223,9 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                                 const SizedBox(height: AppSpacing.lg),
                                 RiskBanner(risk: _store.risk!),
                               ],
-                              if (_store.isPaused) ...[
+                              if (plant.pending)
+                                const SizedBox.shrink()
+                              else if (_store.isPaused) ...[
                                 const SizedBox(height: AppSpacing.lg),
                                 WhatStillWorksCard(photoCount: plant.photoCount),
                                 const SizedBox(height: AppSpacing.lg),
@@ -244,23 +279,26 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                       ],
                     ),
                   ),
-                  Align(
-                    alignment: Alignment.bottomCenter,
-                    child: _ActionBar(
-                      paused: _store.isPaused,
-                      busy: _store.isBusy,
-                      justWatered: _store.justWatered,
-                      onUpdate: () => _checkIn(plant),
-                      onWater: _water,
-                      onSkipWater: _skipWater,
-                      onNote: _addNote,
-                      onResume: () async {
-                        await _store.resumeActiveCare();
-                        if (!context.mounted) return;
-                        await _checkIn(_store.plant);
-                      },
+                  // Every action posts against the plant's id, which a
+                  // draft does not have yet.
+                  if (!plant.pending)
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: _ActionBar(
+                        paused: _store.isPaused,
+                        busy: _store.isBusy,
+                        justWatered: _store.justWatered,
+                        onUpdate: () => _checkIn(plant),
+                        onWater: _water,
+                        onSkipWater: _skipWater,
+                        onNote: _addNote,
+                        onResume: () async {
+                          await _store.resumeActiveCare();
+                          if (!context.mounted) return;
+                          await _checkIn(_store.plant);
+                        },
+                      ),
                     ),
-                  ),
                 ],
               ),
             );

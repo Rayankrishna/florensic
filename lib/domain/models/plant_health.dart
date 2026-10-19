@@ -127,3 +127,35 @@ class NextAction {
   /// Advisory rows sit on a lime-soft ground rather than white.
   final bool highlighted;
 }
+
+/// What the identification photo showed about the plant's health
+/// (`initial_health` on the identify job). Shown on a plant while it is
+/// still being added; the server seeds the first score and care plan from it.
+class InitialHealth {
+  const InitialHealth({
+    required this.verdict,
+    required this.observations,
+    required this.severity,
+  });
+
+  static InitialHealth? fromJson(Object? value) {
+    if (value is! Map) return null;
+    final json = Json.map(value);
+    return InitialHealth(
+      verdict: Json.enumOf(
+        json['verdict'],
+        ConditionVerdict.values,
+        ConditionVerdict.healthy,
+        aliases: const {'needs_attention': ConditionVerdict.needsAttention},
+      ),
+      observations: Json.strings(json['observations']),
+      severity: Json.str(json['severity'], 'none'),
+    );
+  }
+
+  final ConditionVerdict verdict;
+  final List<String> observations;
+
+  /// `none | low | medium | high`.
+  final String severity;
+}

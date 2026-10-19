@@ -341,6 +341,24 @@ class HttpClient {
         'course_not_found' => 'We could not find that treatment plan.',
         'task_not_skippable' => 'Only a treatment step can be skipped.',
         'invalid_timezone' => 'That time zone is not recognised.',
+        'identification_not_ready' =>
+          'Still identifying that photo. Try again in a moment.',
+        'identification_failed' =>
+          'We could not identify that photo. Retake it, or pick the species '
+              'yourself.',
+        'identification_no_match' =>
+          'No confident match for that photo. Pick the species yourself.',
+        'species_name_unusable' =>
+          "That photo doesn't look like a plant. Pick the species yourself, "
+              'or retake it.',
+        'photo_not_identification' =>
+          'A plant starts from an identification photo. Scan it first.',
+        'photo_already_used' => 'That photo already made a plant.',
+        'species_draft_unavailable' =>
+          'We could not add that species just now. Please try again.',
+        'species_draft_quota_exceeded' =>
+          "You've added today's limit of new species. Plants we already "
+              'carry still work.',
         _ => null,
       };
 

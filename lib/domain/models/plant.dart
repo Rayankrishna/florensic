@@ -34,7 +34,58 @@ class Plant {
     this.careScore,
     this.risk,
     this.coverPhoto,
+    this.pending = false,
+    this.localPhotoPath,
+    this.scanHealth,
   });
+
+  /// The plant as it stands the moment the keeper adds it, before
+  /// `POST /v1/plants` answers — a sick scan has its care plan drafted inside
+  /// that request, so it can take a while. Everything shown comes from the
+  /// identification; the score and plan arrive with the saved plant.
+  factory Plant.draft({
+    required PlantSpecies species,
+    required String nickname,
+    String? localPhotoPath,
+    InitialHealth? scanHealth,
+  }) {
+    final now = AppClock.now();
+    final today = DateTime(now.year, now.month, now.day);
+    return Plant(
+      id: 'draft-${now.microsecondsSinceEpoch}',
+      species: species,
+      nickname: nickname.trim().isEmpty ? species.commonName : nickname.trim(),
+      room: 'Unassigned',
+      indoor: true,
+      addedOn: now,
+      healthScore: null,
+      healthBand: null,
+      careStatus: CareStatus.active,
+      schedule: CareSchedule(
+        nextWatering: today,
+        nextWaterAmountMl: 200,
+        frequencyDays: 7,
+        lastWatered: null,
+        lastAmountMl: 0,
+        checkInIntervalDays: 14,
+        checkInWindowDays: 3,
+        checkInWindowOpens: today.add(const Duration(days: 14)),
+        wateringReminder: true,
+        checkInReminder: true,
+        reminderTime: '08:00',
+      ),
+      history: const [],
+      updates: const [],
+      careHistory: const [],
+      photoCount: localPhotoPath == null ? 0 : 1,
+      streakWeeks: 0,
+      lightStatus: MetricStatus.neutral,
+      lightDetail: '',
+      pending: true,
+      localPhotoPath: localPhotoPath,
+      scanHealth: scanHealth,
+    );
+  }
 
   factory Plant.fromJson(Map<String, dynamic> json) {
     final species = PlantSpecies.fromJson(Json.map(json['species']));
@@ -126,6 +177,45 @@ class Plant {
 
   /// The newest photo, or null when the plant was kept without one.
   final CoverPhoto? coverPhoto;
+
+  /// True for a [Plant.draft] the server has not confirmed yet. Its id is
+  /// local, so nothing may be posted against it.
+  final bool pending;
+
+  /// The photo on this device that the plant was identified from. Stands in
+  /// for [coverPhoto] until that has loaded, so the picture never blinks
+  /// back to the artwork after an add.
+  final String? localPhotoPath;
+
+  /// The identification's health read; only a draft carries it.
+  final InitialHealth? scanHealth;
+
+  /// The saved plant, keeping this draft's on-device photo.
+  Plant confirmedAs(Plant saved) => Plant(
+        id: saved.id,
+        species: saved.species,
+        nickname: saved.nickname,
+        room: saved.room,
+        indoor: saved.indoor,
+        addedOn: saved.addedOn,
+        healthScore: saved.healthScore,
+        healthBand: saved.healthBand,
+        careStatus: saved.careStatus,
+        schedule: saved.schedule,
+        history: saved.history,
+        updates: saved.updates,
+        careHistory: saved.careHistory,
+        photoCount: saved.photoCount,
+        streakWeeks: saved.streakWeeks,
+        lightStatus: saved.lightStatus,
+        lightDetail: saved.lightDetail,
+        leafDropReported: saved.leafDropReported,
+        needsAttentionFlag: saved.needsAttentionFlag,
+        careScore: saved.careScore,
+        risk: saved.risk,
+        coverPhoto: saved.coverPhoto,
+        localPhotoPath: localPhotoPath,
+      );
 
   String get latinName => species.latinName;
   HealthBand? get band => healthBand;
@@ -264,6 +354,9 @@ class Plant {
       careScore: careScore,
       risk: risk ?? this.risk,
       coverPhoto: coverPhoto,
+      pending: pending,
+      localPhotoPath: localPhotoPath,
+      scanHealth: scanHealth,
     );
   }
 }

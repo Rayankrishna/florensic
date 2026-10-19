@@ -8,7 +8,6 @@ import '../../routes.dart';
 import '../../shared/components/add_plant_sheet.dart';
 import '../../shared/components/app_button.dart';
 import '../../shared/components/app_surfaces.dart';
-import '../../shared/components/app_toast.dart';
 import '../../shared/components/headers.dart';
 import '../../shared/components/pressable.dart';
 import '../../shared/widgets/pg_icon.dart';
@@ -37,6 +36,12 @@ class ScanResultScreen extends StatelessWidget {
               return const Center(child: CircularProgressIndicator());
             }
             final species = result.species;
+            // A plant the catalogue does not carry yet still identifies —
+            // only the catalogue card (summary, facts, Pokedex page) is
+            // missing. A species just drafted by the search has the page
+            // but an empty card.
+            final listed = species.isListed;
+            final hasCard = listed && species.difficulty.isNotEmpty;
             // The keeper's own photo leads; the catalogue image and then the
             // drawing stand in when there is none (or it cannot be read).
             final shot = store.capture?.file;
@@ -139,7 +144,10 @@ class ScanResultScreen extends StatelessWidget {
                                             color: AppColors.leaf,
                                             borderRadius: AppRadius.pillR,
                                           ),
-                                          child: Text('Match found',
+                                          child: Text(
+                                              result.corrected
+                                                  ? 'Your pick'
+                                                  : 'Match found',
                                               style: AppText.heading17
                                                   .copyWith(fontSize: 16)),
                                         ),
@@ -172,46 +180,71 @@ class ScanResultScreen extends StatelessWidget {
                                       .copyWith(fontSize: 37)),
                               const SizedBox(height: AppSpacing.sm),
                               Text(
-                                species.latinName,
+                                listed
+                                    ? species.latinName
+                                    : 'Not in our catalogue yet — it is '
+                                        'added when you keep it.',
                                 style: AppText.body15.copyWith(
                                     fontSize: 16.5,
-                                    fontStyle: FontStyle.italic),
+                                    fontStyle: listed
+                                        ? FontStyle.italic
+                                        : FontStyle.normal),
                               ),
                               const SizedBox(height: AppSpacing.xl),
                               _ConfidenceCard(result: result),
-                              const SizedBox(height: AppSpacing.xl),
-                              Text(species.summary,
-                                  style:
-                                      AppText.body15.copyWith(fontSize: 16)),
-                              const SizedBox(height: AppSpacing.xl),
-                              EqualHeightRow(
-                                spacing: AppSpacing.md,
-                                children: [
-                                  _MiniFact(
-                                      icon: PgIcons.leaf,
-                                      iconColor: AppColors.healthyDeep,
-                                      label: 'Difficulty',
-                                      value: species.difficulty),
-                                  _MiniFact(
-                                      icon: PgIcons.sun,
-                                      iconColor: AppColors.cautionDeep,
-                                      label: 'Light',
-                                      value: species.shortLight),
-                                  _MiniFact(
-                                      icon: PgIcons.droplet,
-                                      iconColor: AppColors.waterDeep,
-                                      label: 'Water',
-                                      value: '${species.wateringIntervalDays}'
-                                          '–${species.wateringIntervalDays + 3} days'),
+                              if (hasCard) ...[
+                                if (species.summary.isNotEmpty) ...[
+                                  const SizedBox(height: AppSpacing.xl),
+                                  Text(species.summary,
+                                      style: AppText.body15
+                                          .copyWith(fontSize: 16)),
                                 ],
-                              ),
+                                const SizedBox(height: AppSpacing.xl),
+                                EqualHeightRow(
+                                  spacing: AppSpacing.md,
+                                  children: [
+                                    _MiniFact(
+                                        icon: PgIcons.leaf,
+                                        iconColor: AppColors.healthyDeep,
+                                        label: 'Difficulty',
+                                        value: species.difficulty),
+                                    _MiniFact(
+                                        icon: PgIcons.sun,
+                                        iconColor: AppColors.cautionDeep,
+                                        label: 'Light',
+                                        value: species.shortLight),
+                                    _MiniFact(
+                                        icon: PgIcons.droplet,
+                                        iconColor: AppColors.waterDeep,
+                                        label: 'Water',
+                                        value: '${species.wateringIntervalDays}'
+                                            '–${species.wateringIntervalDays + 3} days'),
+                                  ],
+                                ),
+                              ],
                               const SizedBox(height: AppSpacing.section),
                               const SectionHeader(
                                 title: 'Not quite it?',
                                 trailing: 'Other possible matches',
                               ),
                               const SizedBox(height: AppSpacing.lg),
-                              _Alternatives(result: result),
+                              if (result.corrected) ...[
+                                AppButton(
+                                  label: "Use the scan's match instead",
+                                  style: AppButtonStyle.link,
+                                  expand: false,
+                                  height: 44,
+                                  fontSize: 15,
+                                  onPressed: store.revertCorrection,
+                                ),
+                                const SizedBox(height: AppSpacing.md),
+                              ],
+                              _Alternatives(
+                                result: result,
+                                onPick: store.useAlternative,
+                                onSearch: () => Navigator.of(context)
+                                    .pushNamed(AppRoutes.speciesSearch),
+                              ),
                               SizedBox(
                                   height: 150 +
                                       MediaQuery.viewPaddingOf(context)
@@ -249,41 +282,36 @@ class ScanResultScreen extends StatelessWidget {
                       children: [
                         AppButton.primary(
                           label: 'Add to My Plants',
-                          loading: store.isAdding,
                           onPressed: () async {
                             final navigator = Navigator.of(context);
                             final nickname =
                                 await AddPlantSheet.show(context, species);
                             if (nickname == null || !context.mounted) return;
+                            // The save runs on behind the plant's page, which
+                            // opens on what the scan already knows.
                             final plant =
-                                await store.addToCollection(nickname: nickname);
-                            if (plant == null || !context.mounted) return;
+                                store.addToCollection(nickname: nickname);
+                            if (plant == null) return;
                             HapticFeedback.mediumImpact();
                             navigator.popUntil((route) => route.isFirst);
-                            AppToast.show(
-                              context,
-                              message:
-                                  '${plant.nickname} added to your collection',
-                              detail: 'Care schedule starts tomorrow',
-                              actionLabel: 'View',
-                              onAction: () => navigator.pushNamed(
-                                  AppRoutes.plantDetail,
-                                  arguments: plant),
-                            );
+                            navigator.pushNamed(AppRoutes.plantDetail,
+                                arguments: plant);
                           },
                         ),
-                        const SizedBox(height: AppSpacing.sm),
-                        AppButton(
-                          label: 'View in Pokedex',
-                          style: AppButtonStyle.link,
-                          onPressed: () {
-                            locator<PokedexStore>().clearFilters();
-                            Navigator.of(context).pushReplacementNamed(
-                              AppRoutes.speciesDetail,
-                              arguments: species,
-                            );
-                          },
-                        ),
+                        if (listed) ...[
+                          const SizedBox(height: AppSpacing.sm),
+                          AppButton(
+                            label: 'View in Pokedex',
+                            style: AppButtonStyle.link,
+                            onPressed: () {
+                              locator<PokedexStore>().clearFilters();
+                              Navigator.of(context).pushReplacementNamed(
+                                AppRoutes.speciesDetail,
+                                arguments: species,
+                              );
+                            },
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -381,71 +409,82 @@ class _MiniFact extends StatelessWidget {
 }
 
 class _Alternatives extends StatelessWidget {
-  const _Alternatives({required this.result});
+  const _Alternatives({
+    required this.result,
+    required this.onPick,
+    required this.onSearch,
+  });
 
   final IdentificationResult result;
 
+  /// A runner-up the keeper agrees with — listed species only.
+  final ValueChanged<IdentificationAlternative> onPick;
+  final VoidCallback onSearch;
+
   @override
   Widget build(BuildContext context) {
+    final current = result.species.id;
     return SizedBox(
       height: 178,
       child: ListView(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
         children: [
-          for (final alt in result.alternatives) ...[
-            Pressable(
-              onTap: () => Navigator.of(context).pushNamed(
-                  AppRoutes.speciesDetail,
-                  arguments: alt.species),
-              child: Container(
-                width: 140,
-                decoration: const BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: AppRadius.cardR,
-                  boxShadow: AppShadows.raised,
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      height: 92,
-                      child: PhotoOrArtwork(
-                        url: alt.species.imageUrl,
-                        artwork: PlantArtwork(
-                          glyph: alt.species.glyph,
-                          ground: alt.species.ground,
-                          inset: 0.16,
+          for (final alt in result.alternatives)
+            if (!(alt.isListed && alt.species.id == current)) ...[
+              Pressable(
+                // An unlisted runner-up has nothing to resolve to yet.
+                onTap: alt.isListed ? () => onPick(alt) : null,
+                child: Container(
+                  width: 140,
+                  decoration: const BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: AppRadius.cardR,
+                    boxShadow: AppShadows.raised,
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        height: 92,
+                        child: PhotoOrArtwork(
+                          url: alt.species.imageUrl,
+                          artwork: PlantArtwork(
+                            glyph: alt.species.glyph,
+                            ground: alt.species.ground,
+                            inset: 0.16,
+                          ),
                         ),
                       ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            alt.shortName,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppText.heading17.copyWith(fontSize: 15),
-                          ),
-                          const SizedBox(height: 2),
-                          Text('${alt.confidence}% match',
-                              style: AppText.body13.copyWith(fontSize: 12)),
-                        ],
+                      Padding(
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              alt.shortName,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppText.heading17.copyWith(fontSize: 15),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                                alt.isListed
+                                    ? '${alt.confidence}% match'
+                                    : '${alt.confidence}% · not in catalogue',
+                                style: AppText.body13.copyWith(fontSize: 12)),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-          ],
+              const SizedBox(width: AppSpacing.md),
+            ],
           Pressable(
-            onTap: () => Navigator.of(context)
-                .pushReplacementNamed(AppRoutes.pokedex),
+            onTap: onSearch,
             child: Container(
               width: 140,
               decoration: BoxDecoration(

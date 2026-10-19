@@ -3,7 +3,6 @@ import '../../../interceptors/api_interceptor.dart';
 import '../../models/care_task.dart';
 import '../../models/plant.dart';
 import '../../models/plant_photo.dart';
-import '../../models/plant_species.dart';
 import '../../models/treatment.dart';
 import '../../provider/photos.provider.dart';
 import '../../provider/plants.provider.dart';
@@ -74,17 +73,34 @@ class RemotePlantRepository implements PlantRepository {
           {String? note}) =>
       _plants.abandonCourse(courseId, reason.wire, note: note);
 
-  /// With [photoId] the server keeps the identification photo as the
-  /// plant's cover and opens a treatment plan from its findings. On a sick
-  /// scan this can take a little while: the plan is drafted in the request.
+  /// The server scores the photo, writes the care plan and, on a sick scan,
+  /// opens a treatment plan inside this request — budget 7–17 s. A photo
+  /// whose identification has not finished answers
+  /// `identification_not_ready`; that one is polled a few times before it is
+  /// given up on, since the job is seconds from done.
   @override
-  Future<Plant> addPlant(PlantSpecies species,
-          {String? nickname, String? photoId}) =>
-      _plants.create(
-        speciesId: species.id,
-        photoId: photoId,
-        nickname: nickname,
-      );
+  Future<Plant> addPlant({
+    required String photoId,
+    String? speciesId,
+    String? nickname,
+  }) async {
+    for (var attempt = 0;; attempt++) {
+      try {
+        return await _plants.create(
+          photoId: photoId,
+          speciesId: speciesId,
+          nickname: nickname,
+        );
+      } on ApiException catch (e) {
+        if (!e.isIdentificationNotReady || attempt >= _notReadyRetries) {
+          rethrow;
+        }
+      }
+      await Future<void>.delayed(const Duration(seconds: 2));
+    }
+  }
+
+  static const int _notReadyRetries = 10;
 
   @override
   Future<void> removePlant(String plantId) =>

@@ -8,6 +8,54 @@ Dates are not given per entry on purpose — nothing here has shipped yet. The p
 branches in `docs/upgrade/00-map.md`, which is where the reasoning lives; this file is the
 list of what a client can now call, read and expect.
 
+## Breaking — faster identification, and a photo for every plant
+
+Identification measured **16.8 s average and 26.9 s worst** on real photos. None of that was
+the vision call (3.8-4.6 s); it was the catalogue entry being written inside the job and a
+model call normalising problem names nobody had seen before. Both have moved off the path.
+Identification is now **about 5 s**, and `POST /v1/species/resolve` — the correction path —
+answers in **under a second** where it took 9.4-10.6 s.
+
+### What a client must change
+
+- **`POST /v1/plants` requires `photo_id`.** A plant kept without a photograph had no health
+  score, no findings and no treatments; the API no longer makes one.
+- **`species_id` on `POST /v1/plants` is optional**, and means the owner picked it — which is
+  the correction path, and it still wins. Leave it out and the plant is kept as whatever the
+  photo's own identification found, including a species nobody has kept before.
+- **An identification may answer `species: null` on `done`.** That used to mean
+  `no_confident_match`. It now means "a plant we do not carry yet": `AnalysisJob` gains
+  **`scientific_name`**, which is what the model called the plant and is what a client shows
+  when there is no catalogue row to link to.
+- **`no_confident_match` is not returned.** `no_match_confidence_below` ships at `0`, as
+  `escalate_confidence_below` does, so there is one vision call and whatever it reports is
+  shown. Neither mechanism was removed; each is one env value from returning.
+- New error codes on the add: `409 identification_not_ready` (the job is still queued or
+  running), `409 identification_failed` (the job failed — retake the photo or pick the
+  species), `409 identification_no_match` (the job was `no_confident_match` and no
+  `species_id` was sent), `409 photo_not_identification`, `400 species_name_unusable`.
+- **A status change, not only a new code:** sending the owner's **own check-in photo** to
+  `POST /v1/plants` used to answer **`404 photo_not_found`** and now answers
+  **`409 photo_not_identification`**. Someone else's photo, or one that does not exist, is still
+  404. A client that matched on 404 for this case must match the 409.
+- Care plans gain a revision trigger, **`species_enriched`**: the plan of a plant whose species
+  was just added to the catalogue is rewritten once its care card lands.
+
+### What happens behind it
+
+- A species created at add or resolve time carries **only its name**. Its care card is written
+  by the `species.draft` worker, which then revises the care plan of every plant of that
+  species under a new trigger, `species_enriched` — the first plan was drafted from an empty
+  baseline and a generic watering range.
+- A finding whose name our taxonomy does not recognise is filed as `<type>.other` immediately
+  and refined by `care.refine_findings` afterwards. `problem_id` is therefore **never null** on
+  a new finding, and may become more precise a moment after it is first read.
+- Accepted: a plant added in the few seconds before refinement lands opens its course against
+  `<type>.other` rather than the precise problem, and refinement does not re-open it.
+
+`POST /v1/plants` itself is unchanged in cost (16.6 s average): the care plan and the treatment
+drafting still run inside the request. That is audit gap 4 and is not addressed here.
+
 ## Breaking — health score cutover (migration 0020)
 
 `health_score` is now computed by `app/modules/health/v2.py`. It is the same field in the same
@@ -129,6 +177,13 @@ of the way, not all of it, and a plant coming back after a gap is believed outri
 
 ## Fixed after the final audit (`upgrade/8-audit-fixes`)
 
+- **`cover_photo` on every `Plant`** (list, detail, create, patch, species correction): the
+  plant's newest photo as `{photo_id, thumb, working, captured_at}`, or `null`. Additive.
+- **Photo links are served by the API in development.** New `GET /v1/photos/{id}/{variant}`
+  streams `original | working | thumb` behind the owner's token, and with
+  `PHOTO_URL_MODE=proxy` (the default) every `urls.*` and `cover_photo.*` points at it on
+  `PUBLIC_BASE_URL` (or the request's host). `PHOTO_URL_MODE=signed` restores presigned storage
+  links for production. The app must send its bearer token when loading images.
 - **`risk` now sees treatments.** Since Phase 4 a course lives in `treatments`/`treatment_steps`,
   and risk kept reading only care-plan items — so a plant with three open courses and eight
   pending steps reported `active_treatments: 0` and could never show `"treatment step N days

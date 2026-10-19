@@ -146,7 +146,11 @@ abstract class _PlantCollectionStore with Store {
     AppLog.i('loaded ${resp.length} plants, ${todays.length} tasks',
         name: 'plants');
     runInAction(() {
-      plants = ObservableList<Plant>.of(resp);
+      // Drafts still being saved are not on the server's list yet.
+      plants = ObservableList<Plant>.of([
+        ...plants.where((p) => p.pending && resp.every((r) => r.id != p.id)),
+        ...resp,
+      ]);
       tasks = ObservableList<CareTask>.of(todays);
       state = plants.isEmpty ? LoadState.empty : LoadState.ready;
     });
@@ -242,25 +246,85 @@ abstract class _PlantCollectionStore with Store {
     }
   }
 
+  /// Drafts still waiting on `POST /v1/plants`, by draft id. Each settles
+  /// to the saved plant, or null when the add failed and the draft was
+  /// taken back out.
+  final Map<String, Future<Plant?>> _adding = {};
+
+  /// Set beside [errorMessage] when the last add failed because the scan
+  /// could not name the plant: the keeper has to pick the species or retake.
+  @observable
+  bool addNeedsSpeciesPick = false;
+
+  /// How [draftId] settles; null once it is no longer a known draft.
+  Future<Plant?>? whenAdded(String draftId) => _adding[draftId];
+
+  /// Puts the plant in the collection straight away and saves it behind the
+  /// keeper's back: the server scores [photoId], drafts the first care plan
+  /// and any treatment inside the request, which is too slow to wait on.
+  /// [speciesId] goes only when the keeper corrected the identification;
+  /// without it the plant is kept as whatever the photo found. Returns the
+  /// draft; [whenAdded] says how it turned out.
   @action
-  Future<Plant?> addPlant(PlantSpecies species,
-      {String? nickname, String? photoId}) async {
+  Plant addPlant(
+    PlantSpecies species, {
+    required String photoId,
+    String? speciesId,
+    String? nickname,
+    String? localPhotoPath,
+    InitialHealth? scanHealth,
+  }) {
+    final draft = Plant.draft(
+      species: species,
+      nickname: nickname ?? species.commonName,
+      localPhotoPath: localPhotoPath,
+      scanHealth: scanHealth,
+    );
+    plants.insert(0, draft);
+    state = LoadState.ready;
+    addNeedsSpeciesPick = false;
+    _adding[draft.id] = _save(draft, photoId: photoId, speciesId: speciesId);
+    return draft;
+  }
+
+  Future<Plant?> _save(
+    Plant draft, {
+    required String photoId,
+    String? speciesId,
+  }) async {
+    final Plant saved;
     try {
-      final plant = await _repository.addPlant(species,
-          nickname: nickname, photoId: photoId);
-      AppLog.i('added ${plant.nickname}', name: 'plants');
-      runInAction(() {
-        plants.insert(0, plant);
-        state = LoadState.ready;
-      });
-      return plant;
+      saved = await _repository.addPlant(
+        photoId: photoId,
+        speciesId: speciesId,
+        nickname: draft.nickname,
+      );
     } catch (e, stack) {
       AppLog.e('adding a plant failed',
           name: 'plants', error: e, stackTrace: stack);
-      runInAction(
-          () => errorMessage = e is ApiException ? e.message : e.toString());
+      runInAction(() {
+        plants.removeWhere((p) => p.id == draft.id);
+        if (plants.isEmpty) state = LoadState.empty;
+        errorMessage = e is ApiException ? e.message : e.toString();
+        addNeedsSpeciesPick = e is ApiException && e.needsSpeciesPick;
+      });
       return null;
     }
+    AppLog.i('added ${saved.nickname}', name: 'plants');
+    final plant = draft.confirmedAs(saved);
+    runInAction(() {
+      // A refresh that landed meanwhile may already carry the saved plant.
+      plants.removeWhere((p) => p.id == plant.id);
+      final i = plants.indexWhere((p) => p.id == draft.id);
+      if (i == -1) {
+        plants.insert(0, plant);
+      } else {
+        plants[i] = plant;
+      }
+    });
+    // A sick scan opens a treatment plan whose first steps are due today.
+    await refreshTodaysCare();
+    return plant;
   }
 
   @action

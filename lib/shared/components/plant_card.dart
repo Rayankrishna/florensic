@@ -94,9 +94,11 @@ Widget _cover(Plant plant) {
     ground: plant.species.ground,
     inset: 0.08,
   );
-  final cover = plant.coverPhoto;
-  if (cover == null) return artwork;
-  return AuthImage(url: cover.thumb, fallback: artwork);
+  return PhotoOrArtwork(
+    url: plant.coverPhoto?.thumb,
+    localPath: plant.localPhotoPath,
+    artwork: artwork,
+  );
 }
 
 class _ScoreBadge extends StatelessWidget {

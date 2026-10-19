@@ -1,6 +1,10 @@
 import '../../../interceptors/api_interceptor.dart';
 import '../../../shared/services/capture_service.dart';
+import '../../../utils/app_log.dart';
+import '../../models/plant_health.dart';
+import '../../models/plant_species.dart';
 import '../../provider/photos.provider.dart';
+import '../../provider/species.provider.dart';
 import '../identification_repository.dart';
 
 // Providers are injected by name for readable call sites.
@@ -9,10 +13,14 @@ import '../identification_repository.dart';
 /// Real `IdentificationRepository`: upload the capture, poll the job, and
 /// build the result the scan screen already renders.
 class RemoteIdentificationRepository implements IdentificationRepository {
-  RemoteIdentificationRepository({PhotosProvider photos = const PhotosProvider()})
-      : _photos = photos;
+  RemoteIdentificationRepository({
+    PhotosProvider photos = const PhotosProvider(),
+    SpeciesProvider species = const SpeciesProvider(),
+  })  : _photos = photos,
+        _species = species;
 
   final PhotosProvider _photos;
+  final SpeciesProvider _species;
 
   /// The capture to identify. The scanning store sets this immediately
   /// before calling [identify].
@@ -49,9 +57,6 @@ class RemoteIdentificationRepository implements IdentificationRepository {
     lastAlternatives = job.alternatives;
     lastInitialHealth = job.initialHealth;
 
-    if (job.isNoMatch || job.species == null) {
-      throw const NoConfidentMatch();
-    }
     if (job.isFailed) {
       throw ApiException(
         job.error?.isNotEmpty == true
@@ -60,9 +65,14 @@ class RemoteIdentificationRepository implements IdentificationRepository {
         code: 'analysis_failed',
       );
     }
+    // Switched off server-side, kept because one env value brings it back.
+    if (job.isNoMatch) throw const NoConfidentMatch();
 
+    // A null species on a finished job is a plant the catalogue does not
+    // carry yet, not a failure: the name and confidence stand.
     return IdentificationResult(
-      species: job.species!,
+      species: job.species ?? PlantSpecies.unlisted(job.scientificName),
+      scientificName: job.scientificName,
       photoId: queued.photoId,
       confidence: job.confidence ?? 0,
       rationale: job.rationale?.isNotEmpty == true
@@ -70,13 +80,32 @@ class RemoteIdentificationRepository implements IdentificationRepository {
           : 'Matched against the species catalogue.',
       alternatives: [
         for (final alt in job.alternatives)
-          if (alt.species != null)
-            IdentificationAlternative(
-              species: alt.species!,
-              confidence: alt.confidence,
-            ),
+          IdentificationAlternative(
+            species:
+                alt.species ?? PlantSpecies.unlisted(alt.scientificName),
+            confidence: alt.confidence,
+          ),
       ],
+      initialHealth: InitialHealth.fromJson(job.initialHealth),
     );
+  }
+
+  @override
+  Future<List<SpeciesSuggestion>> suggestSpecies(String query) =>
+      _species.suggest(query);
+
+  @override
+  Future<PlantSpecies> resolveSpecies(SpeciesSuggestion suggestion) async {
+    final id = await _species.resolve(suggestion);
+    try {
+      return await _species.byId(id);
+    } on ApiException catch (e) {
+      // Just drafted, and its card may not be readable yet. The id and name
+      // are all the add needs; the server fills the rest in behind it.
+      AppLog.w('species $id not readable after resolve: ${e.code}',
+          name: 'scan');
+      return PlantSpecies.unlisted(suggestion.scientificName, id: id);
+    }
   }
 
   /// The app's `ScanTarget.wholePlant` is `whole_plant` on the wire.

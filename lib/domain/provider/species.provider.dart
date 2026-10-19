@@ -104,8 +104,9 @@ class SpeciesProvider {
         auth: false,
       );
 
-  /// Turns an unresolved suggestion into a catalogue species id. A brand new
-  /// plant takes ~10 s while its care baseline is drafted.
+  /// Turns a suggestion into a catalogue species id, sent back exactly as it
+  /// came. Answers in milliseconds — a brand new plant's care card is written
+  /// by a background job afterwards, so its fields can be empty for a while.
   Future<String> resolve(SpeciesSuggestion suggestion) => _http.post(
         '/species/resolve',
         (json) => Json.str(Json.map(json)['species_id']),

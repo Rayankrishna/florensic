@@ -4,6 +4,7 @@ import 'package:mobx/mobx.dart';
 
 import '../domain/models/plant.dart';
 import '../domain/repositories/identification_repository.dart';
+import '../domain/provider/species.provider.dart';
 import '../domain/repositories/remote/remote_identification_repository.dart';
 import '../enum.dart';
 import '../utils/app_log.dart';
@@ -46,9 +47,6 @@ abstract class _ScanningStore with Store {
   @observable
   String? errorMessage;
 
-  @observable
-  bool isAdding = false;
-
   /// The photo waiting to be identified, so the review UI can show it.
   @observable
   Capture? capture;
@@ -61,6 +59,28 @@ abstract class _ScanningStore with Store {
   /// Settings rather than another prompt.
   @observable
   bool needsSettings = false;
+
+  /// The correction search: what was typed and the rows it brought back.
+  @observable
+  String suggestionQuery = '';
+
+  @observable
+  ObservableList<SpeciesSuggestion> suggestions =
+      ObservableList<SpeciesSuggestion>();
+
+  @observable
+  bool isSuggesting = false;
+
+  /// True while a tapped row is being resolved to a species.
+  @observable
+  bool isCorrecting = false;
+
+  @observable
+  String? correctionError;
+
+  /// The match as the scan made it, kept while a correction stands so the
+  /// keeper can go back to it.
+  IdentificationResult? _uncorrected;
 
   @computed
   bool get isScanning => status == ScanStatus.scanning;
@@ -90,9 +110,93 @@ abstract class _ScanningStore with Store {
   void resetScan() {
     status = ScanStatus.idle;
     result = null;
+    _uncorrected = null;
     errorMessage = null;
     capture = null;
     needsSettings = false;
+    clearSuggestions();
+  }
+
+  @action
+  void clearSuggestions() {
+    suggestionQuery = '';
+    suggestions.clear();
+    correctionError = null;
+  }
+
+  /// Sequence number so a slow answer to an earlier query cannot land over
+  /// the rows for the current one.
+  int _suggestSeq = 0;
+
+  /// Typeahead for the correction search; the screen debounces the typing.
+  @action
+  Future<void> suggestSpecies(String query) async {
+    final q = query.trim();
+    suggestionQuery = q;
+    final seq = ++_suggestSeq;
+    if (q.length < 2) {
+      suggestions.clear();
+      isSuggesting = false;
+      return;
+    }
+    isSuggesting = true;
+    try {
+      final rows = await _repository.suggestSpecies(q);
+      if (seq != _suggestSeq) return;
+      runInAction(() => suggestions = ObservableList<SpeciesSuggestion>.of(rows));
+    } catch (e) {
+      AppLog.w('species suggest failed: $e', name: 'scan');
+    } finally {
+      if (seq == _suggestSeq) runInAction(() => isSuggesting = false);
+    }
+  }
+
+  /// The keeper knows better: resolves the tapped row and keeps the plant as
+  /// that species. The add then sends `species_id`, which is the correction.
+  @action
+  Future<bool> correctSpecies(SpeciesSuggestion pick) async {
+    final match = result;
+    if (match == null || isCorrecting) return false;
+    isCorrecting = true;
+    correctionError = null;
+    try {
+      final species = await _repository.resolveSpecies(pick);
+      runInAction(() {
+        _uncorrected ??= match;
+        result = match.correctedTo(species);
+      });
+      return true;
+    } on ApiException catch (e) {
+      AppLog.w('species correction failed: ${e.code}', name: 'scan');
+      runInAction(() => correctionError = e.message);
+      return false;
+    } catch (e, stack) {
+      AppLog.e('species correction failed',
+          name: 'scan', error: e, stackTrace: stack);
+      runInAction(() => correctionError = e.toString());
+      return false;
+    } finally {
+      runInAction(() => isCorrecting = false);
+    }
+  }
+
+  /// A runner-up the keeper agrees with. It is already a catalogue species,
+  /// so nothing needs resolving; an unlisted one cannot be picked.
+  @action
+  void useAlternative(IdentificationAlternative alt) {
+    final match = result;
+    if (match == null || !alt.isListed) return;
+    _uncorrected ??= match;
+    result = match.correctedTo(alt.species);
+  }
+
+  /// Back to what the scan said.
+  @action
+  void revertCorrection() {
+    final original = _uncorrected;
+    if (original == null) return;
+    result = original;
+    _uncorrected = null;
   }
 
   /// Opens the system camera, then identifies whatever came back — the
@@ -224,20 +328,24 @@ abstract class _ScanningStore with Store {
   @action
   Future<void> openSettings() => _capture.openSettings();
 
+  /// Keeps the plant without waiting on the server: the draft goes into the
+  /// collection at once and the save carries on behind it (see
+  /// [PlantCollectionStore.addPlant]). The photo that found the plant is the
+  /// one required field; the species goes only when the keeper corrected
+  /// the identification. Null when there is nothing to keep.
   @action
-  Future<Plant?> addToCollection({String? nickname}) async {
+  Plant? addToCollection({String? nickname}) {
     final match = result;
-    if (match == null || isAdding) return null;
-    isAdding = true;
-    try {
-      // The photo that found the plant becomes its first photo.
-      return await _collection.addPlant(
-        match.species,
-        nickname: nickname,
-        photoId: match.photoId,
-      );
-    } finally {
-      runInAction(() => isAdding = false);
-    }
+    final photoId = match?.photoId;
+    if (match == null || photoId == null) return null;
+    return _collection.addPlant(
+      match.species,
+      photoId: photoId,
+      speciesId:
+          match.corrected && match.species.isListed ? match.species.id : null,
+      nickname: nickname,
+      localPhotoPath: capture?.path,
+      scanHealth: match.initialHealth,
+    );
   }
 }

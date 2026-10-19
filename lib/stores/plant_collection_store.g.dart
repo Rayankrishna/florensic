@@ -224,6 +224,24 @@ mixin _$PlantCollectionStore on _PlantCollectionStore, Store {
     });
   }
 
+  late final _$addNeedsSpeciesPickAtom = Atom(
+    name: '_PlantCollectionStore.addNeedsSpeciesPick',
+    context: context,
+  );
+
+  @override
+  bool get addNeedsSpeciesPick {
+    _$addNeedsSpeciesPickAtom.reportRead();
+    return super.addNeedsSpeciesPick;
+  }
+
+  @override
+  set addNeedsSpeciesPick(bool value) {
+    _$addNeedsSpeciesPickAtom.reportWrite(value, super.addNeedsSpeciesPick, () {
+      super.addNeedsSpeciesPick = value;
+    });
+  }
+
   late final _$loadPlantsAsyncAction = AsyncAction(
     '_PlantCollectionStore.loadPlants',
     context: context,
@@ -275,22 +293,6 @@ mixin _$PlantCollectionStore on _PlantCollectionStore, Store {
   Future<Plant?> addNote(String plantId, List<NoteChip> chips, {String? text}) {
     return _$addNoteAsyncAction.run(
       () => super.addNote(plantId, chips, text: text),
-    );
-  }
-
-  late final _$addPlantAsyncAction = AsyncAction(
-    '_PlantCollectionStore.addPlant',
-    context: context,
-  );
-
-  @override
-  Future<Plant?> addPlant(
-    PlantSpecies species, {
-    String? nickname,
-    String? photoId,
-  }) {
-    return _$addPlantAsyncAction.run(
-      () => super.addPlant(species, nickname: nickname, photoId: photoId),
     );
   }
 
@@ -368,6 +370,32 @@ mixin _$PlantCollectionStore on _PlantCollectionStore, Store {
   }
 
   @override
+  Plant addPlant(
+    PlantSpecies species, {
+    required String photoId,
+    String? speciesId,
+    String? nickname,
+    String? localPhotoPath,
+    InitialHealth? scanHealth,
+  }) {
+    final _$actionInfo = _$_PlantCollectionStoreActionController.startAction(
+      name: '_PlantCollectionStore.addPlant',
+    );
+    try {
+      return super.addPlant(
+        species,
+        photoId: photoId,
+        speciesId: speciesId,
+        nickname: nickname,
+        localPhotoPath: localPhotoPath,
+        scanHealth: scanHealth,
+      );
+    } finally {
+      _$_PlantCollectionStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
   void clear() {
     final _$actionInfo = _$_PlantCollectionStoreActionController.startAction(
       name: '_PlantCollectionStore.clear',
@@ -389,6 +417,7 @@ errorMessage: ${errorMessage},
 searchQuery: ${searchQuery},
 selectedFilter: ${selectedFilter},
 busyPlantId: ${busyPlantId},
+addNeedsSpeciesPick: ${addNeedsSpeciesPick},
 isLoading: ${isLoading},
 isEmpty: ${isEmpty},
 filteredPlants: ${filteredPlants},
