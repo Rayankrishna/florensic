@@ -135,19 +135,20 @@ class AppShadows {
   ];
 }
 
-/// Type scale. Display / Title / Heading / Metric use Outfit;
-/// Body / Caption use Plus Jakarta Sans.
+/// Type scale. One family, Inter Tight, at two weights: 400 for running
+/// text and 500 for everything that used to be bold — nothing heavier is
+/// bundled, so size and spacing carry the hierarchy.
 class AppText {
   const AppText._();
 
-  static const String display = 'Outfit';
-  static const String body = 'PlusJakartaSans';
+  static const String display = 'InterTight';
+  static const String body = 'InterTight';
 
   static const TextStyle display40 = TextStyle(
     fontFamily: display,
     fontSize: 37,
     height: 1.05,
-    fontWeight: FontWeight.w800,
+    fontWeight: FontWeight.w500,
     letterSpacing: -1.2,
     color: AppColors.ink,
   );
@@ -156,7 +157,7 @@ class AppText {
     fontFamily: display,
     fontSize: 26,
     height: 1.12,
-    fontWeight: FontWeight.w700,
+    fontWeight: FontWeight.w500,
     letterSpacing: -0.7,
     color: AppColors.ink,
   );
@@ -165,7 +166,7 @@ class AppText {
     fontFamily: display,
     fontSize: 18.5,
     height: 1.2,
-    fontWeight: FontWeight.w700,
+    fontWeight: FontWeight.w500,
     letterSpacing: -0.3,
     color: AppColors.ink,
   );
@@ -174,7 +175,7 @@ class AppText {
     fontFamily: display,
     fontSize: 16,
     height: 1.25,
-    fontWeight: FontWeight.w700,
+    fontWeight: FontWeight.w500,
     letterSpacing: -0.2,
     color: AppColors.ink,
   );
@@ -207,7 +208,7 @@ class AppText {
     fontFamily: body,
     fontSize: 11.5,
     height: 1.3,
-    fontWeight: FontWeight.w600,
+    fontWeight: FontWeight.w500,
     letterSpacing: 1.1,
     color: AppColors.inkMuted,
   );
@@ -216,7 +217,7 @@ class AppText {
     fontFamily: body,
     fontSize: 12,
     height: 1.3,
-    fontWeight: FontWeight.w600,
+    fontWeight: FontWeight.w500,
     color: AppColors.ink,
   );
 
@@ -224,7 +225,7 @@ class AppText {
     fontFamily: display,
     fontSize: 41,
     height: 1.0,
-    fontWeight: FontWeight.w800,
+    fontWeight: FontWeight.w500,
     letterSpacing: -2,
     color: AppColors.ink,
   );
@@ -233,7 +234,7 @@ class AppText {
     fontFamily: display,
     fontSize: 15,
     height: 1.2,
-    fontWeight: FontWeight.w700,
+    fontWeight: FontWeight.w500,
     letterSpacing: -0.1,
     color: AppColors.ink,
   );

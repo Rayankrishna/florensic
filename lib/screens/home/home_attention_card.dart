@@ -60,8 +60,8 @@ class HomeAttentionCard extends StatelessWidget {
             ClipRRect(
               borderRadius: BorderRadius.circular(AppRadius.tile),
               child: SizedBox(
-                width: 56,
-                height: 56,
+                width: 48,
+                height: 48,
                 child: plant.coverPhoto != null
                     ? AuthImage(
                         url: plant.coverPhoto!.thumb,
@@ -100,20 +100,20 @@ class HomeAttentionCard extends StatelessWidget {
                     tone: status.status,
                     isWater: status.isWater,
                   ),
-                  const SizedBox(height: 5),
+                  const SizedBox(height: 4),
                   Text(
                     plant.nickname,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: AppText.heading20.copyWith(fontSize: 17),
+                    style: AppText.heading20.copyWith(fontSize: 16),
                   ),
                   const SizedBox(height: 1),
                   Text(
                     _body(plant),
-                    maxLines: 2,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: AppText.body13.copyWith(
-                      fontSize: 12.5,
+                      fontSize: 12,
                       height: 1.3,
                       color: bodyColor,
                     ),
@@ -124,9 +124,10 @@ class HomeAttentionCard extends StatelessWidget {
             const SizedBox(width: AppSpacing.sm),
             CircleIconButton(
               icon: needsUpdate ? PgIcons.camera : PgIcons.chevronRight,
-              size: 40,
-              background: onLeaf ? AppColors.ink : AppColors.neutralTint,
-              foreground: onLeaf ? AppColors.leaf : AppColors.ink,
+              size: 36,
+              // White on the leaf card: ink against this green fights it.
+              background: onLeaf ? Colors.white : AppColors.neutralTint,
+              foreground: onLeaf ? AppColors.healthyDeep : AppColors.ink,
               elevated: false,
               onPressed: act,
               semanticLabel: needsUpdate
@@ -178,8 +179,8 @@ class _StatusPill extends StatelessWidget {
     final Color bg;
     final Color fg;
     if (onLeaf) {
-      bg = AppColors.ink;
-      fg = AppColors.leaf;
+      bg = Colors.white;
+      fg = AppColors.healthyDeep;
     } else if (isWater) {
       bg = AppColors.waterTint;
       fg = AppColors.waterDeep;

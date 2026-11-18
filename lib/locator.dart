@@ -8,11 +8,11 @@ import 'domain/repositories/identification_repository.dart';
 import 'domain/repositories/insights_repository.dart';
 import 'domain/repositories/notifications_repository.dart';
 import 'domain/repositories/plant_repository.dart';
-import 'domain/repositories/pokedex_repository.dart';
+import 'domain/repositories/plantdex_repository.dart';
 import 'domain/repositories/remote/remote_identification_repository.dart';
 import 'domain/repositories/remote/remote_insights_repository.dart';
 import 'domain/repositories/remote/remote_plant_repository.dart';
-import 'domain/repositories/remote/remote_pokedex_repository.dart';
+import 'domain/repositories/remote/remote_plantdex_repository.dart';
 import 'shared/services/capture_service.dart';
 import 'storage_manager.dart';
 import 'stores/app_shell_store.dart';
@@ -24,7 +24,7 @@ import 'stores/onboarding_store.dart';
 import 'stores/permissions_store.dart';
 import 'stores/plant_collection_store.dart';
 import 'stores/plant_detail_store.dart';
-import 'stores/pokedex_store.dart';
+import 'stores/plantdex_store.dart';
 import 'stores/profile_store.dart';
 import 'stores/scanning_store.dart';
 
@@ -37,7 +37,7 @@ final GetIt locator = GetIt.instance;
 class RepositoryBundle {
   const RepositoryBundle({
     required this.plants,
-    required this.pokedex,
+    required this.plantdex,
     required this.insights,
     required this.identification,
     required this.notifications,
@@ -48,7 +48,7 @@ class RepositoryBundle {
   /// the store calls [AuthProvider] directly, as in the lead app.
   factory RepositoryBundle.remote() => RepositoryBundle(
         plants: RemotePlantRepository(),
-        pokedex: RemotePokedexRepository(),
+        plantdex: RemotePlantdexRepository(),
         insights: RemoteInsightsRepository(),
         identification: RemoteIdentificationRepository(),
         // No notifications endpoint yet — the screen shows its empty state.
@@ -57,7 +57,7 @@ class RepositoryBundle {
       );
 
   final PlantRepository plants;
-  final PokedexRepository pokedex;
+  final PlantdexRepository plantdex;
   final InsightsRepository insights;
   final IdentificationRepository identification;
   final NotificationsRepository notifications;
@@ -86,7 +86,7 @@ Future<void> setupLocator({
     ..registerSingleton<AuthProvider>(const AuthProvider())
     ..registerSingleton<CaptureService>(bundle.capture)
     ..registerSingleton<PlantRepository>(bundle.plants)
-    ..registerSingleton<PokedexRepository>(bundle.pokedex)
+    ..registerSingleton<PlantdexRepository>(bundle.plantdex)
     ..registerSingleton<InsightsRepository>(bundle.insights)
     ..registerSingleton<IdentificationRepository>(bundle.identification)
     ..registerSingleton<NotificationsRepository>(bundle.notifications);
@@ -110,7 +110,7 @@ void _registerStores(StorageManager storage) {
     ..registerSingleton<AppShellStore>(AppShellStore(storage))
     ..registerSingleton<PlantCollectionStore>(
         PlantCollectionStore(locator<PlantRepository>()))
-    ..registerSingleton<PokedexStore>(PokedexStore(locator<PokedexRepository>()))
+    ..registerSingleton<PlantdexStore>(PlantdexStore(locator<PlantdexRepository>()))
     ..registerSingleton<InsightsStore>(
         InsightsStore(locator<InsightsRepository>()))
     ..registerSingleton<NotificationsStore>(

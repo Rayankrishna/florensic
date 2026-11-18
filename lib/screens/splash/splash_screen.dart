@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import '../../locator.dart';
 import '../../routes.dart';
 import '../../shared/components/app_surfaces.dart';
-import '../../shared/widgets/pg_icon.dart';
 import '../../stores/auth_store.dart';
 import '../../stores/onboarding_store.dart';
 import '../../stores/permissions_store.dart';
@@ -174,7 +173,8 @@ class _SplashScreenState extends State<SplashScreen>
   }
 }
 
-/// The ink badge carrying the lime leaf — the app's mark.
+/// The app's mark: the launcher icon itself, so the badge on the splash and
+/// sign-in screens is the one on the phone's home screen.
 class AppMark extends StatelessWidget {
   const AppMark({super.key, this.size = 44, this.radius});
 
@@ -183,15 +183,15 @@ class AppMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: AppColors.ink,
-        borderRadius: BorderRadius.circular(radius ?? size * 0.32),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius ?? size * 0.32),
+      child: Image.asset(
+        'assets/images/app_icon.png',
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        filterQuality: FilterQuality.medium,
       ),
-      child: PgIcon(PgIcons.leaf, size: size * 0.52, color: AppColors.leaf),
     );
   }
 }

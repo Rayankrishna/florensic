@@ -24,8 +24,10 @@ class TileRow extends StatelessWidget {
     this.detailColor,
     this.strikeThrough = false,
     this.titleMaxLines = 3,
+    this.detailMaxLines,
     this.elevated = true,
     this.padding = const EdgeInsets.all(AppSpacing.lg),
+    this.iconSize = 52,
     this.leading,
   });
 
@@ -41,8 +43,14 @@ class TileRow extends StatelessWidget {
   final Color? detailColor;
   final bool strikeThrough;
   final int titleMaxLines;
+
+  /// Null lets the detail run; a number clips it with an ellipsis.
+  final int? detailMaxLines;
   final bool elevated;
   final EdgeInsetsGeometry padding;
+
+  /// The icon tile's side; 52 on the default row, 44 on a compact one.
+  final double iconSize;
   final Widget? leading;
 
   @override
@@ -65,6 +73,7 @@ class TileRow extends StatelessWidget {
                 IconTile(
                   icon: icon,
                   tone: tone,
+                  size: iconSize,
                   background: iconBackground,
                   foreground: iconForeground,
                 ),
@@ -90,6 +99,9 @@ class TileRow extends StatelessWidget {
                     const SizedBox(height: 3),
                     Text(
                       detail!,
+                      maxLines: detailMaxLines,
+                      overflow:
+                          detailMaxLines == null ? null : TextOverflow.ellipsis,
                       style: AppText.body13.copyWith(
                         fontSize: 14,
                         color: detailColor ?? AppColors.inkMuted,

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
@@ -26,9 +27,16 @@ String get serverUrl {
   return 'http://localhost:8010';
 }
 
-/// The shared test server (hand-off of 2026-10-07). Replaces the ngrok
-/// tunnel; images load from it without any tunnel.
+/// The shared test server (hand-off of 2026-10-07), plain HTTP until it has
+/// a certificate — the debug manifest allows cleartext for it. When the API
+/// is reached through an ngrok tunnel instead, this is the one line to
+/// update; photo links come back on the same host, so images follow it.
 const String testServerUrl = 'http://13.202.212.73:8012';
+
+/// ngrok's free tier answers a request that looks like a browser with an
+/// HTML warning page unless this header is present. Sent on every call and
+/// every image load; any other host ignores it.
+const String ngrokSkipWarningHeader = 'ngrok-skip-browser-warning';
 
 /// Every route sits under this prefix.
 const String apiVersion = '/v1';
@@ -71,7 +79,10 @@ class HttpClient {
         connectTimeout: const Duration(seconds: 100),
         receiveTimeout: const Duration(seconds: 200),
         receiveDataWhenStatusError: true,
-        headers: const {'Accept': 'application/json'},
+        headers: const {
+          'Accept': 'application/json',
+          ngrokSkipWarningHeader: 'true',
+        },
       ),
     );
     final client = HttpClient(authService: dio, tokens: tokens);
@@ -84,13 +95,34 @@ class HttpClient {
 
   // ── Interceptors ─────────────────────────────────────────────────────────
 
-  /// Bearer token on every call that wants one; one silent refresh when the
-  /// server says `token_expired`, then the call is retried; the end of the
-  /// session on any other 401 outside `/auth/*`.
+  /// 401 codes that mean "sign in again" — no refresh can rescue them.
+  /// Every other 401 (`unauthorized`, `invalid_token`, `token_expired`, or
+  /// none) is worth one refresh and a retry.
+  static const Set<String> _signInAgainCodes = {
+    'token_reused',
+    'invalid_credentials',
+    'oauth_invalid',
+  };
+
+  /// Bearer token on every call that wants one. An access token lives 15
+  /// minutes, so an expired one is rotated *before* the call goes out; a
+  /// 401 that comes back anyway gets one silent refresh and a retry. The
+  /// session ends when the refresh token is refused (expired after 30 days,
+  /// revoked, or already used) or the server still says no with a fresh
+  /// token — never over a network failure, which keeps the saved pair.
   Interceptor _authInterceptor() => InterceptorsWrapper(
-        onRequest: (options, handler) {
+        onRequest: (options, handler) async {
+          if (options.extra[noAuthKey] == true) return handler.next(options);
+          // Coalesced, so a screen firing several calls at once refreshes
+          // once. A refresh that fails lets the call go out as it is — the
+          // 401 path below has the last word.
+          if (_tokens.current?.isExpired ?? false) {
+            try {
+              await _refreshTokens();
+            } catch (_) {}
+          }
           final token = _tokens.current?.accessToken;
-          if (options.extra[noAuthKey] != true && token != null) {
+          if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
           }
           handler.next(options);
@@ -104,25 +136,27 @@ class HttpClient {
             return handler.next(e);
           }
 
-          if (_codeOf(e) == 'token_expired' &&
-              options.extra[_retriedKey] != true) {
-            try {
-              await _refreshTokens();
-            } catch (_) {
-              // Refused or unreachable; the call fails with its own 401.
-              return handler.next(e);
-            }
-            options.extra[_retriedKey] = true;
-            try {
-              return handler.resolve(await authService.fetch<dynamic>(options));
-            } on DioException catch (retry) {
-              return handler.next(retry);
-            }
+          if (_signInAgainCodes.contains(_codeOf(e)) ||
+              options.extra[_retriedKey] == true) {
+            _endSession();
+            return handler.next(e);
           }
 
-          // A 401 a refresh cannot rescue: the session is over.
-          _endSession();
-          handler.next(e);
+          try {
+            await _refreshTokens();
+          } catch (_) {
+            // Refused (the session is already over) or unreachable (the
+            // pair is kept for next time); the call fails with its own 401.
+            return handler.next(e);
+          }
+          options.extra[_retriedKey] = true;
+          try {
+            return handler.resolve(await authService.fetch<dynamic>(options));
+          } on DioException catch (retry) {
+            // A fresh token still refused: nothing more a client can do.
+            if (retry.response?.statusCode == 401) _endSession();
+            return handler.next(retry);
+          }
         },
       );
 
@@ -384,6 +418,11 @@ class HttpClient {
 /// shown as `***`, and the Authorization header is not printed at all.
 class _DebugLogInterceptor extends Interceptor {
   static const String _startedKey = 'logStartedAt';
+
+  /// Responses whose body is printed as it comes back, one line per item,
+  /// so the list can be read and grepped in the console. Kept to the few
+  /// that get debugged by eye — the plant list would run to pages.
+  static const Set<String> _bodyLoggedPaths = {'/care/today'};
   static const Set<String> _secrets = {
     'password',
     'new_password',
@@ -414,8 +453,32 @@ class _DebugLogInterceptor extends Interceptor {
         '← ${response.statusCode} ${o.method} ${o.path}${_elapsed(o)}',
         name: 'api',
       );
+      _logBody(o.path, response.data);
     }
     handler.next(response);
+  }
+
+  static void _logBody(String path, Object? data) {
+    if (!_bodyLoggedPaths.contains(path)) return;
+    try {
+      final items = data is List
+          ? data
+          : data is Map && data['items'] is List
+              ? data['items'] as List
+              : null;
+      if (items == null) {
+        AppLog.d('  body: ${data is String ? data : jsonEncode(data)}',
+            name: 'api');
+        return;
+      }
+      AppLog.d('  ${items.length} item(s)', name: 'api');
+      for (var i = 0; i < items.length; i++) {
+        AppLog.d('  [$i] ${jsonEncode(items[i])}', name: 'api');
+      }
+    } catch (e) {
+      // A log line must never take the request down with it.
+      AppLog.d('  body: <unprintable: $e>', name: 'api');
+    }
   }
 
   @override

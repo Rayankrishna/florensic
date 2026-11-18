@@ -25,8 +25,8 @@ enum MetricKind { watering, light, environment, condition }
 /// Collection filter chips on My Plants.
 enum PlantFilter { all, indoor, outdoor, needsAttention }
 
-/// Discovery filter chips on the Pokedex.
-enum PokedexFilter { indoor, lowLight, beginner, petFriendly }
+/// Discovery filter chips on the Plantdex.
+enum PlantdexFilter { indoor, lowLight, beginner, petFriendly }
 
 /// Notification filter chips.
 enum NotificationFilter { all, watering, checkIns, environment }
@@ -109,12 +109,12 @@ extension PlantFilterX on PlantFilter {
       };
 }
 
-extension PokedexFilterX on PokedexFilter {
+extension PlantdexFilterX on PlantdexFilter {
   String get label => switch (this) {
-        PokedexFilter.indoor => 'Indoor',
-        PokedexFilter.lowLight => 'Low light',
-        PokedexFilter.beginner => 'Beginner',
-        PokedexFilter.petFriendly => 'Pet friendly',
+        PlantdexFilter.indoor => 'Indoor',
+        PlantdexFilter.lowLight => 'Low light',
+        PlantdexFilter.beginner => 'Beginner',
+        PlantdexFilter.petFriendly => 'Pet friendly',
       };
 }
 

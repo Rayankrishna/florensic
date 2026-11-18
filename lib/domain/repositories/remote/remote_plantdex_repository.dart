@@ -1,17 +1,17 @@
 import '../../models/plant_species.dart';
 import '../../provider/species.provider.dart';
-import '../pokedex_repository.dart';
+import '../plantdex_repository.dart';
 
 // Providers are injected by name for readable call sites.
 // ignore_for_file: prefer_initializing_formals
 
-/// Real `PokedexRepository`.
+/// Real `PlantdexRepository`.
 ///
 /// The catalogue is paged and growing, so `catalogueSize` and
 /// `plantOfTheWeek` are filled by the first load and read synchronously
 /// afterwards, which keeps the store's interface unchanged.
-class RemotePokedexRepository implements PokedexRepository {
-  RemotePokedexRepository({SpeciesProvider provider = const SpeciesProvider()})
+class RemotePlantdexRepository implements PlantdexRepository {
+  RemotePlantdexRepository({SpeciesProvider provider = const SpeciesProvider()})
       : _provider = provider;
 
   final SpeciesProvider _provider;

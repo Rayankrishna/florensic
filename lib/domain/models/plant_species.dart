@@ -2,7 +2,7 @@ import '../../enum.dart';
 import '../core/json.dart';
 import 'species_artwork.dart';
 
-/// A Pokedex entry — the reference record for a species.
+/// A Plantdex entry — the reference record for a species.
 class PlantSpecies {
   const PlantSpecies({
     required this.id,
@@ -55,7 +55,7 @@ class PlantSpecies {
       tags: Json.list(json['tags']).map(SpeciesTag.fromJson).toList(),
       traits: Json.strings(json['traits'])
           .map(_traitFrom)
-          .whereType<PokedexFilter>()
+          .whereType<PlantdexFilter>()
           .toSet(),
       commonIssues:
           Json.list(json['common_issues']).map(SpeciesIssue.fromJson).toList(),
@@ -96,11 +96,11 @@ class PlantSpecies {
     );
   }
 
-  static PokedexFilter? _traitFrom(String raw) => switch (raw) {
-        'indoor' => PokedexFilter.indoor,
-        'low_light' => PokedexFilter.lowLight,
-        'beginner' => PokedexFilter.beginner,
-        'pet_friendly' => PokedexFilter.petFriendly,
+  static PlantdexFilter? _traitFrom(String raw) => switch (raw) {
+        'indoor' => PlantdexFilter.indoor,
+        'low_light' => PlantdexFilter.lowLight,
+        'beginner' => PlantdexFilter.beginner,
+        'pet_friendly' => PlantdexFilter.petFriendly,
         _ => null,
       };
 
@@ -132,7 +132,7 @@ class PlantSpecies {
   final List<SpeciesTag> tags;
 
   /// Which discovery filters this species answers to.
-  final Set<PokedexFilter> traits;
+  final Set<PlantdexFilter> traits;
   final List<SpeciesIssue> commonIssues;
   final List<String> careTips;
 

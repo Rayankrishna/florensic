@@ -92,6 +92,29 @@ class AppTransitions {
     );
   }
 
+  /// A photo opened full screen. The picture itself flies out of the spot it
+  /// was tapped — the same hero flight a plant card makes into its page —
+  /// so the route only fades the ground in behind it. Not opaque: the page
+  /// underneath stays drawn while the flight runs and while a drag down
+  /// lets it show through.
+  static Route<T> photo<T>(Widget page, RouteSettings settings) {
+    return _SeeThroughRoute<T>(
+      settings: settings,
+      transitionDuration: _fast,
+      reverseTransitionDuration: _fast,
+      pageBuilder: (context, animation, secondary) => page,
+      transitionsBuilder: (context, animation, secondary, child) =>
+          FadeTransition(
+        opacity: CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        ),
+        child: child,
+      ),
+    );
+  }
+
   /// Cross-fade, for root swaps such as splash → auth → shell.
   static Route<T> fade<T>(Widget page, RouteSettings settings) {
     return PageRouteBuilder<T>(
@@ -104,4 +127,21 @@ class AppTransitions {
       ),
     );
   }
+}
+
+/// A route the page beneath keeps showing through. It never drives that
+/// page's outgoing transition, so the page stays exactly where it was —
+/// a drag down reveals it in place, and a photo flies back into a spot that
+/// is not sliding away. Heroes still fly: it is a page route.
+class _SeeThroughRoute<T> extends PageRouteBuilder<T> {
+  _SeeThroughRoute({
+    super.settings,
+    required super.pageBuilder,
+    required super.transitionsBuilder,
+    super.transitionDuration,
+    super.reverseTransitionDuration,
+  }) : super(opaque: false);
+
+  @override
+  bool canTransitionFrom(TransitionRoute<dynamic> previousRoute) => false;
 }

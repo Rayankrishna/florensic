@@ -1,10 +1,73 @@
+import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../domain/core/services_config.dart';
 import '../../domain/core/token_store.dart';
 import '../../locator.dart';
+
+/// What a request for [url] has to carry: the bearer token for our own API,
+/// nothing for a signed storage link, which must never see it.
+Map<String, String>? _authHeaders(String url) {
+  if (!url.startsWith(serverUrl)) return null;
+  final token = locator.isRegistered<TokenStore>()
+      ? locator<TokenStore>().current?.accessToken
+      : null;
+  if (token == null) return null;
+  return {'Authorization': 'Bearer $token', ngrokSkipWarningHeader: 'true'};
+}
+
+/// An image cached by its address alone.
+///
+/// `NetworkImage` counts its headers in its cache key, and ours carry a
+/// bearer token that changes every 15 minutes — so each refresh orphaned
+/// every photo already downloaded and fetched it all again. This provider
+/// reads the token only at the moment it fetches, so one copy of a photo
+/// serves the whole session, and a picture already on screen resolves at
+/// once anywhere else it is shown.
+@immutable
+class AuthNetworkImage extends ImageProvider<AuthNetworkImage> {
+  const AuthNetworkImage(this.url);
+
+  final String url;
+
+  @override
+  Future<AuthNetworkImage> obtainKey(ImageConfiguration configuration) =>
+      SynchronousFuture<AuthNetworkImage>(this);
+
+  @override
+  ImageStreamCompleter loadImage(
+    AuthNetworkImage key,
+    ImageDecoderCallback decode,
+  ) {
+    final inner = NetworkImage(key.url, headers: _authHeaders(key.url));
+    final completer = inner.loadImage(inner, decode);
+    // A failure — an expired token, mostly — must not stay cached under
+    // this key, or the retry after a refresh would be served the same error.
+    completer.addEphemeralErrorListener(
+      (_, _) => scheduleMicrotask(
+        () => PaintingBinding.instance.imageCache.evict(key),
+      ),
+    );
+    return completer;
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is AuthNetworkImage && other.url == url;
+
+  @override
+  int get hashCode => url.hashCode;
+
+  @override
+  String toString() => '${objectRuntimeType(this, 'AuthNetworkImage')}("$url")';
+}
+
+/// The provider [AuthImage] draws [url] with — the same cache entry. The
+/// photo viewer reads a photo's true shape through it.
+ImageProvider authImageProvider(String url) => AuthNetworkImage(url);
 
 /// A photo served by the API.
 ///
@@ -61,10 +124,9 @@ class _AuthImageState extends State<AuthImage> {
     if (widget.url.isEmpty) return widget.fallback;
     final token = locator<TokenStore>().current?.accessToken;
     if (_isApiUrl && token == null) return widget.fallback;
-    return Image.network(
-      widget.url,
+    return Image(
+      image: AuthNetworkImage(widget.url),
       key: ValueKey('${widget.url}#$_attempt'),
-      headers: _isApiUrl ? {'Authorization': 'Bearer $token'} : null,
       fit: widget.fit,
       alignment: widget.alignment,
       gaplessPlayback: true,

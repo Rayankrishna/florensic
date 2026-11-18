@@ -17,17 +17,15 @@ abstract class _ProfileStore with Store {
   @computed
   UserProfile? get profile => _auth.profile;
 
+  /// Empty until the profile has loaded — there is no stand-in account.
   @computed
-  String get name => profile?.name ?? 'Alex Moreau';
+  String get name => profile?.name ?? '';
 
   @computed
-  String get email => profile?.email ?? 'alex.moreau@studio.co';
+  String get email => profile?.email ?? '';
 
   @computed
-  String get initial => profile?.initial ?? 'A';
-
-  @computed
-  String get city => profile?.city ?? 'Mumbai';
+  String get initial => profile?.initial ?? '?';
 
   /// Live counts, so the profile reflects what the collection actually holds.
   @computed
@@ -41,16 +39,7 @@ abstract class _ProfileStore with Store {
   int? get averageHealth => _collection.averageHealth;
 
   @computed
-  int get careStreakWeeks => profile?.careStreakWeeks ?? 32;
-
-  @computed
-  String get streakSince => profile?.streakSince ?? 'February';
-
-  @computed
-  String get reminderTime => profile?.reminderTime ?? '08:00';
-
-  @computed
-  String get units => profile?.units ?? '°C · ml';
+  int get careStreakWeeks => profile?.careStreakWeeks ?? 0;
 
   @action
   Future<void> signOut() async {

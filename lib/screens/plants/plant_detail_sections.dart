@@ -28,14 +28,17 @@ import '../../utils/date_format.dart';
 /// for a detail view, the drawn artwork for a plant kept without a photo.
 /// Shares the collection card's hero so the thumbnail grows into place.
 class PlantPhotoCard extends StatelessWidget {
-  const PlantPhotoCard({super.key, required this.plant});
+  const PlantPhotoCard({super.key, required this.plant, this.onTap});
 
   final Plant plant;
+
+  /// Opens the photo full screen; null while there is only the drawing.
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final cover = plant.coverPhoto;
-    return Hero(
+    final card = Hero(
       tag: AppKeys.plantHero(plant.id),
       child: ClipRRect(
         borderRadius: AppRadius.cardR,
@@ -77,6 +80,13 @@ class PlantPhotoCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+    if (onTap == null) return card;
+    return Pressable(
+      onTap: onTap,
+      scale: 0.985,
+      semanticLabel: 'View photo',
+      child: card,
     );
   }
 }
@@ -791,10 +801,14 @@ class UnavailableTrendCard extends StatelessWidget {
 /// Real photos when the gallery has loaded any; the drawn artwork stands in
 /// before that and for a plant kept without a photo.
 class ConditionHistoryStrip extends StatelessWidget {
+  /// Photos shown as thumbnails before the "+N" tile.
+  static const int visible = 3;
+
   const ConditionHistoryStrip({
     super.key,
     required this.plant,
     this.photos = const [],
+    this.onOpen,
   });
 
   final Plant plant;
@@ -802,9 +816,12 @@ class ConditionHistoryStrip extends StatelessWidget {
   /// Newest first.
   final List<PlantPhoto> photos;
 
+  /// Opens the viewer on the photo at this index of [photos]; the overflow
+  /// tile opens it on the first photo it hides.
+  final ValueChanged<int>? onOpen;
+
   @override
   Widget build(BuildContext context) {
-    const visible = 3;
     final shown = photos.isEmpty ? visible : photos.length.clamp(0, visible);
     final overflow = plant.photoCount - shown;
     return SizedBox(
@@ -816,7 +833,7 @@ class ConditionHistoryStrip extends StatelessWidget {
         separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.md),
         itemBuilder: (context, index) {
           if (index == shown) {
-            return Container(
+            final more = Container(
               width: 104,
               alignment: Alignment.center,
               decoration: BoxDecoration(
@@ -826,6 +843,40 @@ class ConditionHistoryStrip extends StatelessWidget {
               ),
               child: Text('+$overflow',
                   style: AppText.heading20.copyWith(fontSize: 18.5)),
+            );
+            final open = onOpen;
+            if (open == null || photos.length <= shown) return more;
+            final next = photos[shown];
+            // The first hidden photo sits behind the count, under a veil of
+            // the page's ground, so it can grow out of this tile like the
+            // others do.
+            return Pressable(
+              onTap: () => open(shown),
+              scale: 0.95,
+              semanticLabel: '$overflow more photos',
+              child: Hero(
+                tag: AppKeys.photoHero(next.id),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadius.tile),
+                  child: SizedBox(
+                    width: 104,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        AuthImage(url: next.urls.thumb, fallback: more),
+                        ColoredBox(
+                          color: AppColors.ground.withValues(alpha: 0.72),
+                        ),
+                        Center(
+                          child: Text('+$overflow',
+                              style:
+                                  AppText.heading20.copyWith(fontSize: 18.5)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             );
           }
           final artwork = PlantArtwork(
@@ -837,13 +888,26 @@ class ConditionHistoryStrip extends StatelessWidget {
                     : GroundPalette.mint),
             inset: 0.14,
           );
-          return ClipRRect(
+          final thumb = ClipRRect(
             borderRadius: BorderRadius.circular(AppRadius.tile),
             child: SizedBox(
               width: 104,
               child: index < photos.length
                   ? AuthImage(url: photos[index].urls.thumb, fallback: artwork)
                   : artwork,
+            ),
+          );
+          final open = onOpen;
+          // The drawn stand-ins are not photos; there is nothing to open.
+          if (open == null || index >= photos.length) return thumb;
+          return Pressable(
+            onTap: () => open(index),
+            scale: 0.95,
+            semanticLabel:
+                'Photo taken ${AppDate.dayMonth(photos[index].takenAt.toLocal())}',
+            child: Hero(
+              tag: AppKeys.photoHero(photos[index].id),
+              child: thumb,
             ),
           );
         },
@@ -1017,7 +1081,7 @@ class _RemovePlantSheetState extends State<_RemovePlantSheet> {
                   children: [
                     Text(
                       'This removes its schedule, health score and '
-                      '${plant.photoCount} condition photos. The Pokedex entry '
+                      '${plant.photoCount} condition photos. The Plantdex entry '
                       'stays available.',
                       style: AppText.body15Ink.copyWith(fontSize: 15),
                     ),

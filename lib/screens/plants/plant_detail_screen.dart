@@ -22,6 +22,7 @@ import '../../stores/plant_detail_store.dart';
 import '../../theme.dart';
 import '../../utils/date_format.dart';
 import 'plant_detail_sections.dart';
+import 'plant_photo_viewer.dart';
 
 /// The plant health dashboard.
 ///
@@ -66,6 +67,7 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
     final saved = await _store.settleDraft();
     if (saved || !mounted) return;
     final navigator = Navigator.of(context);
+    final page = ModalRoute.of(context);
     final pick = _store.draftNeedsSpeciesPick;
     AppToast.show(
       context,
@@ -80,6 +82,8 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
             ..pushNamed(AppRoutes.speciesSearch)
           : null,
     );
+    // Close anything above this page first, so it is this page that goes.
+    if (page != null) navigator.popUntil((route) => route == page);
     navigator.maybePop();
   }
 
@@ -131,6 +135,25 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
     } else if (_store.errorMessage != null) {
       AppToast.show(context, message: _store.errorMessage!);
     }
+  }
+
+  /// The photo full screen, grown out of whichever spot was tapped.
+  Future<void> _openPhotos({bool fromCard = false, int index = 0}) async {
+    // A gallery read long ago carries links that have since expired.
+    if (_store.photosLoaded && _store.photosStale) {
+      await _store.loadPhotos();
+      if (!mounted) return;
+    }
+    final plant = _store.plant;
+    if (plant == null) return;
+    final args = plantPhotoViewerArgs(
+      plant,
+      _store.photos,
+      fromCard: fromCard,
+      index: index,
+    );
+    if (args == null) return;
+    Navigator.of(context).pushNamed(AppRoutes.photos, arguments: args);
   }
 
   /// Completes once the check-in is saved (its screen is replaced by the
@@ -195,7 +218,16 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                           ),
                           sliver: SliverList.list(
                             children: [
-                              PlantPhotoCard(plant: plant),
+                              PlantPhotoCard(
+                                plant: plant,
+                                // Not while it is still being saved: the
+                                // save's outcome must find this page on top.
+                                onTap: plant.pending ||
+                                        (plant.coverPhoto == null &&
+                                            plant.localPhotoPath == null)
+                                    ? null
+                                    : () => _openPhotos(fromCard: true),
+                              ),
                               const SizedBox(height: AppSpacing.lg),
                               // The add's slow half, narrated while the
                               // setup job drafts treatments and the plan.
@@ -275,6 +307,7 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                                 ConditionHistoryStrip(
                                   plant: plant,
                                   photos: _store.photos,
+                                  onOpen: (index) => _openPhotos(index: index),
                                 ),
                               ],
                             ],

@@ -51,27 +51,9 @@ flutter:
     - assets/images/
 
   fonts:
-    - family: Outfit
+    - family: InterTight
       fonts:
-        - asset: assets/fonts/Outfit-400.ttf
+        - asset: assets/fonts/InterTight-400.ttf
           weight: 400
-        - asset: assets/fonts/Outfit-500.ttf
+        - asset: assets/fonts/InterTight-500.ttf
           weight: 500
-        - asset: assets/fonts/Outfit-600.ttf
-          weight: 600
-        - asset: assets/fonts/Outfit-700.ttf
-          weight: 700
-        - asset: assets/fonts/Outfit-800.ttf
-          weight: 800
-    - family: PlusJakartaSans
-      fonts:
-        - asset: assets/fonts/PlusJakartaSans-400.ttf
-          weight: 400
-        - asset: assets/fonts/PlusJakartaSans-500.ttf
-          weight: 500
-        - asset: assets/fonts/PlusJakartaSans-600.ttf
-          weight: 600
-        - asset: assets/fonts/PlusJakartaSans-700.ttf
-          weight: 700
-        - asset: assets/fonts/PlusJakartaSans-800.ttf
-          weight: 800

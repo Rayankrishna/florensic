@@ -46,7 +46,7 @@ class FilterChipPill extends StatelessWidget {
           duration: const Duration(milliseconds: 220),
           style: AppText.body15Ink.copyWith(
             fontFamily: AppText.display,
-            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            fontWeight: FontWeight.w500,
             color: selected ? selectedLabelColor : unselectedLabelColor,
             fontSize: 14,
           ),
@@ -90,7 +90,7 @@ class TagPill extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
         style: (dense ? AppText.label13 : AppText.body15Ink).copyWith(
           color: fg,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w500,
           fontSize: dense ? 12.5 : 15,
         ),
       ),

@@ -138,6 +138,10 @@ class ScreenBackground extends StatelessWidget {
     this.glowColor = const Color(0xFFCDE3B2),
     this.glowRadius = 0.9,
     this.glowOpacity = 0.55,
+    this.bottomGlow = false,
+    this.bottomGlowAlignment = const Alignment(0, 1.05),
+    this.bottomGlowRadius = 0.8,
+    this.bottomGlowOpacity = 0.8,
   });
 
   final Widget child;
@@ -146,6 +150,14 @@ class ScreenBackground extends StatelessWidget {
   final Color glowColor;
   final double glowRadius;
   final double glowOpacity;
+
+  /// A second, softer glow rising from the foot of the screen — the tab
+  /// pages use it so the floating nav bar sits on something rather than on
+  /// flat ground. Same colour as the top glow.
+  final bool bottomGlow;
+  final Alignment bottomGlowAlignment;
+  final double bottomGlowRadius;
+  final double bottomGlowOpacity;
 
   @override
   Widget build(BuildContext context) {
@@ -163,6 +175,24 @@ class ScreenBackground extends StatelessWidget {
                       radius: glowRadius,
                       colors: [
                         glowColor.withValues(alpha: glowOpacity),
+                        glowColor.withValues(alpha: 0),
+                      ],
+                      stops: const [0, 1],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          if (bottomGlow)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      center: bottomGlowAlignment,
+                      radius: bottomGlowRadius,
+                      colors: [
+                        glowColor.withValues(alpha: bottomGlowOpacity),
                         glowColor.withValues(alpha: 0),
                       ],
                       stops: const [0, 1],

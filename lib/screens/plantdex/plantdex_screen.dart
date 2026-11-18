@@ -17,31 +17,31 @@ import '../../shared/widgets/pg_icon.dart';
 import '../../shared/components/pressable.dart';
 import '../../shared/widgets/plant_artwork.dart';
 import '../../shared/widgets/skeleton.dart';
-import '../../stores/pokedex_store.dart';
+import '../../stores/plantdex_store.dart';
 import '../../theme.dart';
 import '../shell/app_shell.dart';
 
-/// `Pokedex` — species discovery: search, trait filters, a weekly feature and
+/// `Plantdex` — species discovery: search, trait filters, a weekly feature and
 /// the catalogue grid.
-class PokedexScreen extends StatefulWidget {
-  const PokedexScreen({super.key, this.embedded = false});
+class PlantdexScreen extends StatefulWidget {
+  const PlantdexScreen({super.key, this.embedded = false});
 
   /// True when hosted inside the shell rather than pushed as its own route.
   final bool embedded;
 
   @override
-  State<PokedexScreen> createState() => _PokedexScreenState();
+  State<PlantdexScreen> createState() => _PlantdexScreenState();
 }
 
-class _PokedexScreenState extends State<PokedexScreen> {
-  final PokedexStore _store = locator<PokedexStore>();
+class _PlantdexScreenState extends State<PlantdexScreen> {
+  final PlantdexStore _store = locator<PlantdexStore>();
   late final TextEditingController _search =
       TextEditingController(text: _store.searchQuery);
 
   @override
   void initState() {
     super.initState();
-    _store.loadPokedex();
+    _store.loadPlantdex();
   }
 
   @override
@@ -54,6 +54,7 @@ class _PokedexScreenState extends State<PokedexScreen> {
   Widget build(BuildContext context) {
     final body = ScreenBackground(
       glow: false,
+      bottomGlow: true,
       child: SafeArea(
         bottom: false,
         child: Observer(
@@ -98,7 +99,7 @@ class _PokedexScreenState extends State<PokedexScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Expanded(
-                            child: Text('Pokedex', style: AppText.display40),
+                            child: Text('Plantdex', style: AppText.display40),
                           ),
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -135,11 +136,11 @@ class _PokedexScreenState extends State<PokedexScreen> {
                       physics: const BouncingScrollPhysics(),
                       padding: const EdgeInsets.fromLTRB(AppSpacing.gutter,
                           AppSpacing.xl, AppSpacing.gutter, AppSpacing.xl),
-                      itemCount: PokedexFilter.values.length,
+                      itemCount: PlantdexFilter.values.length,
                       separatorBuilder: (_, __) =>
                           const SizedBox(width: AppSpacing.md),
                       itemBuilder: (context, index) {
-                        final filter = PokedexFilter.values[index];
+                        final filter = PlantdexFilter.values[index];
                         return FilterChipPill(
                           label: filter.label,
                           selected: _store.selectedFilters.contains(filter),
@@ -238,7 +239,7 @@ class _PokedexScreenState extends State<PokedexScreen> {
 class _PlantOfTheWeek extends StatelessWidget {
   const _PlantOfTheWeek({required this.store});
 
-  final PokedexStore store;
+  final PlantdexStore store;
 
   @override
   Widget build(BuildContext context) {

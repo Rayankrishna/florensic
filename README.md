@@ -51,7 +51,7 @@ lib/
 │   └── repositories/    # Interfaces + remote implementations
 │       └── remote/      # The API-backed repositories
 ├── interceptors/        # Request hooks (logging, latency) around the client
-├── screens/             # One folder per flow (auth, home, plants, pokedex…)
+├── screens/             # One folder per flow (auth, home, plants, plantdex…)
 ├── shared/
 │   ├── components/      # Buttons, cards, chips, sheets, rows, toasts
 │   └── widgets/         # Painters: icon family, plant artwork, ring, charts

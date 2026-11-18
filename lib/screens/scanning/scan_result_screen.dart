@@ -13,7 +13,7 @@ import '../../shared/components/pressable.dart';
 import '../../shared/widgets/pg_icon.dart';
 import '../../shared/widgets/auth_image.dart';
 import '../../shared/widgets/plant_artwork.dart';
-import '../../stores/pokedex_store.dart';
+import '../../stores/plantdex_store.dart';
 import '../../stores/scanning_store.dart';
 import '../../theme.dart';
 
@@ -37,7 +37,7 @@ class ScanResultScreen extends StatelessWidget {
             }
             final species = result.species;
             // A plant the catalogue does not carry yet still identifies —
-            // only the catalogue card (summary, facts, Pokedex page) is
+            // only the catalogue card (summary, facts, Plantdex page) is
             // missing. A species just drafted by the search has the page
             // but an empty card.
             final listed = species.isListed;
@@ -301,10 +301,10 @@ class ScanResultScreen extends StatelessWidget {
                         if (listed) ...[
                           const SizedBox(height: AppSpacing.sm),
                           AppButton(
-                            label: 'View in Pokedex',
+                            label: 'View in Plantdex',
                             style: AppButtonStyle.link,
                             onPressed: () {
-                              locator<PokedexStore>().clearFilters();
+                              locator<PlantdexStore>().clearFilters();
                               Navigator.of(context).pushReplacementNamed(
                                 AppRoutes.speciesDetail,
                                 arguments: species,

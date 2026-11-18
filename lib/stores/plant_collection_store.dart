@@ -146,6 +146,7 @@ abstract class _PlantCollectionStore with Store {
 
     AppLog.i('loaded ${resp.length} plants, ${todays.length} tasks',
         name: 'plants');
+    _logTodaysCare(todays);
     runInAction(() {
       // Drafts still being saved are not on the server's list yet.
       plants = ObservableList<Plant>.of([
@@ -170,10 +171,32 @@ abstract class _PlantCollectionStore with Store {
     if (plant.paused && !previous.paused) refreshTodaysCare();
   }
 
+  /// Today's list as it came back: the shape of the day on one line, then
+  /// every task — a kind that landed as `unknown`, a step with no plan, an
+  /// overdue watering, all show up here. The raw JSON is printed by the
+  /// client's logger just above it.
+  void _logTodaysCare(List<CareTask> todays) {
+    final byKind = <String, int>{};
+    for (final t in todays) {
+      byKind[t.kind.name] = (byKind[t.kind.name] ?? 0) + 1;
+    }
+    final done = todays.where((t) => t.done).length;
+    AppLog.i(
+      "today's care: ${todays.length} task(s), $done done"
+      '${byKind.isEmpty ? '' : ' — '}'
+      '${byKind.entries.map((e) => '${e.key} ${e.value}').join(', ')}',
+      name: 'plants',
+    );
+    for (final t in todays) {
+      AppLog.d('  $t', name: 'plants');
+    }
+  }
+
   @action
   Future<void> refreshTodaysCare() async {
     try {
       final todays = await _repository.loadTodaysCare();
+      _logTodaysCare(todays);
       runInAction(() => tasks = ObservableList<CareTask>.of(todays));
     } catch (e, stack) {
       AppLog.e("refreshing today's care failed",

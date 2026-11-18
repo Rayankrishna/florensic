@@ -130,7 +130,7 @@ class _ScoreBadge extends StatelessWidget {
   }
 }
 
-/// A Pokedex card: catalogue number over the artwork, then the names and two
+/// A Plantdex card: catalogue number over the artwork, then the names and two
 /// compact trait chips.
 class SpeciesCard extends StatelessWidget {
   const SpeciesCard({super.key, required this.species, this.onTap});

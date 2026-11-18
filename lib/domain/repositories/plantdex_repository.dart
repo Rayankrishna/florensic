@@ -1,7 +1,7 @@
 import '../../enum.dart';
 import '../models/plant_species.dart';
 
-abstract class PokedexRepository {
+abstract class PlantdexRepository {
   Future<List<PlantSpecies>> loadCatalogue();
 
   Future<PlantSpecies> speciesById(String id);
@@ -13,13 +13,13 @@ abstract class PokedexRepository {
 }
 
 /// Filter + search, kept out of the store so it can be unit-tested alone.
-class PokedexQuery {
-  const PokedexQuery._();
+class PlantdexQuery {
+  const PlantdexQuery._();
 
   static List<PlantSpecies> apply(
     List<PlantSpecies> source, {
     required String query,
-    required Set<PokedexFilter> filters,
+    required Set<PlantdexFilter> filters,
   }) {
     return source
         .where((s) => s.matches(query))

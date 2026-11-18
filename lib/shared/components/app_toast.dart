@@ -20,9 +20,29 @@ class AppToast {
     VoidCallback? onAction,
     Duration duration = const Duration(seconds: 3),
   }) {
-    dismiss();
     final overlay = Overlay.maybeOf(context);
     if (overlay == null) return;
+    showIn(
+      overlay,
+      message: message,
+      detail: detail,
+      actionLabel: actionLabel,
+      onAction: onAction,
+      duration: duration,
+    );
+  }
+
+  /// For the few things that happen with no screen of their own — a session
+  /// ending mid-flow — pass the root navigator's overlay directly.
+  static void showIn(
+    OverlayState overlay, {
+    required String message,
+    String? detail,
+    String? actionLabel,
+    VoidCallback? onAction,
+    Duration duration = const Duration(seconds: 3),
+  }) {
+    dismiss();
 
     late final OverlayEntry entry;
     entry = OverlayEntry(

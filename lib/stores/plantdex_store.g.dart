@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'pokedex_store.dart';
+part of 'plantdex_store.dart';
 
 // **************************************************************************
 // StoreGenerator
@@ -8,20 +8,20 @@ part of 'pokedex_store.dart';
 
 // ignore_for_file: non_constant_identifier_names, unnecessary_brace_in_string_interps, unnecessary_lambdas, prefer_expression_function_bodies, lines_longer_than_80_chars, avoid_as, avoid_annotating_with_dynamic, no_leading_underscores_for_local_identifiers
 
-mixin _$PokedexStore on _PokedexStore, Store {
+mixin _$PlantdexStore on _PlantdexStore, Store {
   Computed<bool>? _$isLoadingComputed;
 
   @override
   bool get isLoading => (_$isLoadingComputed ??= Computed<bool>(
     () => super.isLoading,
-    name: '_PokedexStore.isLoading',
+    name: '_PlantdexStore.isLoading',
   )).value;
   Computed<int>? _$catalogueSizeComputed;
 
   @override
   int get catalogueSize => (_$catalogueSizeComputed ??= Computed<int>(
     () => super.catalogueSize,
-    name: '_PokedexStore.catalogueSize',
+    name: '_PlantdexStore.catalogueSize',
   )).value;
   Computed<PlantSpecies>? _$plantOfTheWeekComputed;
 
@@ -29,7 +29,7 @@ mixin _$PokedexStore on _PokedexStore, Store {
   PlantSpecies get plantOfTheWeek =>
       (_$plantOfTheWeekComputed ??= Computed<PlantSpecies>(
         () => super.plantOfTheWeek,
-        name: '_PokedexStore.plantOfTheWeek',
+        name: '_PlantdexStore.plantOfTheWeek',
       )).value;
   Computed<List<PlantSpecies>>? _$filteredSpeciesComputed;
 
@@ -37,32 +37,32 @@ mixin _$PokedexStore on _PokedexStore, Store {
   List<PlantSpecies> get filteredSpecies =>
       (_$filteredSpeciesComputed ??= Computed<List<PlantSpecies>>(
         () => super.filteredSpecies,
-        name: '_PokedexStore.filteredSpecies',
+        name: '_PlantdexStore.filteredSpecies',
       )).value;
   Computed<bool>? _$hasQueryComputed;
 
   @override
   bool get hasQuery => (_$hasQueryComputed ??= Computed<bool>(
     () => super.hasQuery,
-    name: '_PokedexStore.hasQuery',
+    name: '_PlantdexStore.hasQuery',
   )).value;
   Computed<String>? _$resultsLabelComputed;
 
   @override
   String get resultsLabel => (_$resultsLabelComputed ??= Computed<String>(
     () => super.resultsLabel,
-    name: '_PokedexStore.resultsLabel',
+    name: '_PlantdexStore.resultsLabel',
   )).value;
   Computed<bool>? _$isEmptyComputed;
 
   @override
   bool get isEmpty => (_$isEmptyComputed ??= Computed<bool>(
     () => super.isEmpty,
-    name: '_PokedexStore.isEmpty',
+    name: '_PlantdexStore.isEmpty',
   )).value;
 
   late final _$speciesAtom = Atom(
-    name: '_PokedexStore.species',
+    name: '_PlantdexStore.species',
     context: context,
   );
 
@@ -79,7 +79,7 @@ mixin _$PokedexStore on _PokedexStore, Store {
     });
   }
 
-  late final _$stateAtom = Atom(name: '_PokedexStore.state', context: context);
+  late final _$stateAtom = Atom(name: '_PlantdexStore.state', context: context);
 
   @override
   LoadState get state {
@@ -95,7 +95,7 @@ mixin _$PokedexStore on _PokedexStore, Store {
   }
 
   late final _$errorMessageAtom = Atom(
-    name: '_PokedexStore.errorMessage',
+    name: '_PlantdexStore.errorMessage',
     context: context,
   );
 
@@ -113,7 +113,7 @@ mixin _$PokedexStore on _PokedexStore, Store {
   }
 
   late final _$searchQueryAtom = Atom(
-    name: '_PokedexStore.searchQuery',
+    name: '_PlantdexStore.searchQuery',
     context: context,
   );
 
@@ -131,71 +131,73 @@ mixin _$PokedexStore on _PokedexStore, Store {
   }
 
   late final _$selectedFiltersAtom = Atom(
-    name: '_PokedexStore.selectedFilters',
+    name: '_PlantdexStore.selectedFilters',
     context: context,
   );
 
   @override
-  ObservableSet<PokedexFilter> get selectedFilters {
+  ObservableSet<PlantdexFilter> get selectedFilters {
     _$selectedFiltersAtom.reportRead();
     return super.selectedFilters;
   }
 
   @override
-  set selectedFilters(ObservableSet<PokedexFilter> value) {
+  set selectedFilters(ObservableSet<PlantdexFilter> value) {
     _$selectedFiltersAtom.reportWrite(value, super.selectedFilters, () {
       super.selectedFilters = value;
     });
   }
 
-  late final _$loadPokedexAsyncAction = AsyncAction(
-    '_PokedexStore.loadPokedex',
+  late final _$loadPlantdexAsyncAction = AsyncAction(
+    '_PlantdexStore.loadPlantdex',
     context: context,
   );
 
   @override
-  Future<void> loadPokedex({bool force = false}) {
-    return _$loadPokedexAsyncAction.run(() => super.loadPokedex(force: force));
+  Future<void> loadPlantdex({bool force = false}) {
+    return _$loadPlantdexAsyncAction.run(
+      () => super.loadPlantdex(force: force),
+    );
   }
 
-  late final _$_PokedexStoreActionController = ActionController(
-    name: '_PokedexStore',
+  late final _$_PlantdexStoreActionController = ActionController(
+    name: '_PlantdexStore',
     context: context,
   );
 
   @override
   void setSearchQuery(String value) {
-    final _$actionInfo = _$_PokedexStoreActionController.startAction(
-      name: '_PokedexStore.setSearchQuery',
+    final _$actionInfo = _$_PlantdexStoreActionController.startAction(
+      name: '_PlantdexStore.setSearchQuery',
     );
     try {
       return super.setSearchQuery(value);
     } finally {
-      _$_PokedexStoreActionController.endAction(_$actionInfo);
+      _$_PlantdexStoreActionController.endAction(_$actionInfo);
     }
   }
 
   @override
-  void toggleFilter(PokedexFilter filter) {
-    final _$actionInfo = _$_PokedexStoreActionController.startAction(
-      name: '_PokedexStore.toggleFilter',
+  void toggleFilter(PlantdexFilter filter) {
+    final _$actionInfo = _$_PlantdexStoreActionController.startAction(
+      name: '_PlantdexStore.toggleFilter',
     );
     try {
       return super.toggleFilter(filter);
     } finally {
-      _$_PokedexStoreActionController.endAction(_$actionInfo);
+      _$_PlantdexStoreActionController.endAction(_$actionInfo);
     }
   }
 
   @override
   void clearFilters() {
-    final _$actionInfo = _$_PokedexStoreActionController.startAction(
-      name: '_PokedexStore.clearFilters',
+    final _$actionInfo = _$_PlantdexStoreActionController.startAction(
+      name: '_PlantdexStore.clearFilters',
     );
     try {
       return super.clearFilters();
     } finally {
-      _$_PokedexStoreActionController.endAction(_$actionInfo);
+      _$_PlantdexStoreActionController.endAction(_$actionInfo);
     }
   }
 

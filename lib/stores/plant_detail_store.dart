@@ -468,6 +468,18 @@ abstract class _PlantDetailStore with Store {
     coursesLoaded = false;
     photos.clear();
     photosLoaded = false;
+    _photosLoadedAt = null;
+  }
+
+  DateTime? _photosLoadedAt;
+
+  /// Photo links are signed for about 15 minutes in production. A gallery
+  /// older than that is read again before the viewer opens on it, so the
+  /// full-size pages do not ask for links that have expired.
+  bool get photosStale {
+    final at = _photosLoadedAt;
+    return at == null ||
+        AppClock.now().difference(at) > const Duration(minutes: 14);
   }
 
   /// True when the draft's add failed because the scan could not name the
@@ -513,6 +525,7 @@ abstract class _PlantDetailStore with Store {
     if (p == null || p.pending) return;
     try {
       final list = await _repository.loadPhotos(p.id);
+      _photosLoadedAt = AppClock.now();
       runInAction(() {
         photos = ObservableList<PlantPhoto>.of(list);
         photosLoaded = true;

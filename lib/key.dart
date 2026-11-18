@@ -20,7 +20,11 @@ class AppKeys {
 
   static const String plantHeroPrefix = 'plant-hero-';
   static const String speciesHeroPrefix = 'species-hero-';
+  static const String photoHeroPrefix = 'photo-hero-';
 
   static String plantHero(String id) => '$plantHeroPrefix$id';
   static String speciesHero(String id) => '$speciesHeroPrefix$id';
+
+  /// One photo in a plant's history strip and the viewer it opens.
+  static String photoHero(String id) => '$photoHeroPrefix$id';
 }

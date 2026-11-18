@@ -4,6 +4,9 @@ include: package:flutter_lints/flutter.yaml
 analyzer:
   exclude:
     - "**/*.g.dart"
+    - build/**
+    - android/**
+    - ios/**
   errors:
     # MobX stores are declared as `class Store = _Store with _$Store`, which the
     # generator requires. The private base type is part of that contract.

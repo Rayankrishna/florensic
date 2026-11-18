@@ -386,13 +386,26 @@ abstract class _AuthStore with Store {
     await syncTimezone();
   }
 
-  /// The client calls this when a refresh could not rescue the session.
+  /// Where a session that ended under the keeper's feet sends them — the
+  /// app wires this to its root navigator, since a store has no screen.
+  void Function(String message)? onSignedOut;
+
+  /// The client calls this when a refresh could not rescue the session: the
+  /// refresh token expired or was revoked, or a fresh access token was still
+  /// refused. The tokens are already gone; this clears the rest and, if the
+  /// keeper was mid-session, sends them back to sign in. On launch, with no
+  /// profile yet, the splash screen does the routing instead.
   @action
   void handleSessionExpired() {
+    final wasSignedIn = profile != null;
     AppLog.w('session expired, signing out', name: 'auth');
     profile = null;
-    errorMessage = 'Your session has ended. Please sign in again.';
+    sessionState = LoadState.idle;
+    errorMessage = null;
     _clearSession();
+    if (wasSignedIn) {
+      onSignedOut?.call('Your session has ended. Please sign in again.');
+    }
   }
 
   /// Sends the device's IANA zone when it differs from the one on the

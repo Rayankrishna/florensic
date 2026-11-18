@@ -16,7 +16,7 @@ import '../../shared/widgets/auth_image.dart';
 import '../../shared/widgets/plant_artwork.dart';
 import '../../theme.dart';
 
-/// A Pokedex entry: the reference record for one species.
+/// A Plantdex entry: the reference record for one species.
 class SpeciesDetailScreen extends StatefulWidget {
   const SpeciesDetailScreen({super.key, required this.species});
 

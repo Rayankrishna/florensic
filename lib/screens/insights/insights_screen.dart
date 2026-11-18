@@ -26,6 +26,7 @@ class InsightsScreen extends StatelessWidget {
     final store = locator<InsightsStore>();
     return ScreenBackground(
       glow: false,
+      bottomGlow: true,
       child: SafeArea(
         bottom: false,
         child: Observer(

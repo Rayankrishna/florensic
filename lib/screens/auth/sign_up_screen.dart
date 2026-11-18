@@ -164,7 +164,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                         text: 'Terms of Service',
                                         style: TextStyle(
                                           color: AppColors.ink,
-                                          fontWeight: FontWeight.w700,
+                                          fontWeight: FontWeight.w500,
                                           decoration: TextDecoration.underline,
                                         ),
                                       ),
@@ -173,7 +173,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                         text: 'Privacy Policy',
                                         style: TextStyle(
                                           color: AppColors.ink,
-                                          fontWeight: FontWeight.w700,
+                                          fontWeight: FontWeight.w500,
                                           decoration: TextDecoration.underline,
                                         ),
                                       ),

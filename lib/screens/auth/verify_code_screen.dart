@@ -179,7 +179,7 @@ class _VerifyCodeScreenState extends State<VerifyCodeScreen> {
                                   : _store.pendingEmail,
                               style: const TextStyle(
                                 color: AppColors.ink,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                             const TextSpan(text: '. It expires in 10 minutes.'),

@@ -411,7 +411,7 @@ class _HealthHero extends StatelessWidget {
                       style: TextStyle(
                         fontFamily: AppText.display,
                         fontSize: 30,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w500,
                         color: Colors.white,
                         letterSpacing: -1,
                       ),
@@ -689,7 +689,7 @@ class _DiscoverHero extends StatelessWidget {
                       Text('2,400+',
                           style: AppText.heading17.copyWith(fontSize: 16.5)),
                       const SizedBox(width: AppSpacing.sm),
-                      Text('species in the Pokedex',
+                      Text('species in the Plantdex',
                           style: AppText.body15.copyWith(fontSize: 15)),
                     ],
                   ),

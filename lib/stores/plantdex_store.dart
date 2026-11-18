@@ -1,19 +1,19 @@
 import 'package:mobx/mobx.dart';
 
 import '../domain/models/plant_species.dart';
-import '../domain/repositories/pokedex_repository.dart';
+import '../domain/repositories/plantdex_repository.dart';
 import '../enum.dart';
 import '../interceptors/api_interceptor.dart';
 import '../utils/app_log.dart';
 
-part 'pokedex_store.g.dart';
+part 'plantdex_store.g.dart';
 
-class PokedexStore = _PokedexStore with _$PokedexStore;
+class PlantdexStore = _PlantdexStore with _$PlantdexStore;
 
-abstract class _PokedexStore with Store {
-  _PokedexStore(this._repository);
+abstract class _PlantdexStore with Store {
+  _PlantdexStore(this._repository);
 
-  final PokedexRepository _repository;
+  final PlantdexRepository _repository;
 
   @observable
   ObservableList<PlantSpecies> species = ObservableList<PlantSpecies>();
@@ -28,7 +28,7 @@ abstract class _PokedexStore with Store {
   String searchQuery = '';
 
   @observable
-  ObservableSet<PokedexFilter> selectedFilters = ObservableSet<PokedexFilter>();
+  ObservableSet<PlantdexFilter> selectedFilters = ObservableSet<PlantdexFilter>();
 
   @computed
   bool get isLoading => state == LoadState.loading;
@@ -40,7 +40,7 @@ abstract class _PokedexStore with Store {
   PlantSpecies get plantOfTheWeek => _repository.plantOfTheWeek;
 
   @computed
-  List<PlantSpecies> get filteredSpecies => PokedexQuery.apply(
+  List<PlantSpecies> get filteredSpecies => PlantdexQuery.apply(
         species,
         query: searchQuery,
         filters: selectedFilters,
@@ -68,7 +68,7 @@ abstract class _PokedexStore with Store {
   void setSearchQuery(String value) => searchQuery = value;
 
   @action
-  void toggleFilter(PokedexFilter filter) {
+  void toggleFilter(PlantdexFilter filter) {
     if (selectedFilters.contains(filter)) {
       selectedFilters.remove(filter);
     } else {
@@ -83,7 +83,7 @@ abstract class _PokedexStore with Store {
   }
 
   @action
-  Future<void> loadPokedex({bool force = false}) async {
+  Future<void> loadPlantdex({bool force = false}) async {
     if (state == LoadState.loading) return;
     if (!force && species.isNotEmpty) return;
     state = LoadState.loading;
@@ -94,7 +94,7 @@ abstract class _PokedexStore with Store {
       resp = await _repository.loadCatalogue();
     } catch (e, stack) {
       AppLog.e('loading the catalogue failed',
-          name: 'pokedex', error: e, stackTrace: stack);
+          name: 'plantdex', error: e, stackTrace: stack);
       runInAction(() {
         errorMessage = e is ApiException ? e.message : e.toString();
         if (species.isEmpty) state = LoadState.error;
@@ -102,7 +102,7 @@ abstract class _PokedexStore with Store {
       return;
     }
 
-    AppLog.i('loaded ${resp.length} species', name: 'pokedex');
+    AppLog.i('loaded ${resp.length} species', name: 'plantdex');
     runInAction(() {
       species = ObservableList<PlantSpecies>.of(resp);
       state = LoadState.ready;

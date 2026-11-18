@@ -148,7 +148,7 @@ class _AppTextFieldState extends State<AppTextField> {
   }
 }
 
-/// The rounded search field used on My Plants, the Pokedex and elsewhere.
+/// The rounded search field used on My Plants, the Plantdex and elsewhere.
 class AppSearchField extends StatelessWidget {
   const AppSearchField({
     super.key,

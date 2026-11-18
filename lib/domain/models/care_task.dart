@@ -61,6 +61,20 @@ class CareTask {
 
   bool get servesWholePlan => problemId == 'all';
 
+  /// One line for the console: `task-water-… watering plant=… "Water
+  /// Corn Plant" overdue`.
+  @override
+  String toString() {
+    final flags = [
+      if (overdue) 'overdue',
+      if (done) 'done',
+      if (problem != null) 'problem=$problem',
+      if (courseId != null) 'course=$courseId',
+    ];
+    return '$id ${kind.name} plant=$plantId "$title"'
+        '${flags.isEmpty ? '' : ' ${flags.join(' ')}'}';
+  }
+
   CareTask copyWith({bool? done, String? doneAt}) => CareTask(
         id: id,
         plantId: plantId,

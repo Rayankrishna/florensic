@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 
@@ -6,17 +8,15 @@ import '../../locator.dart';
 import '../../routes.dart';
 import '../../shared/components/app_button.dart';
 import '../../shared/components/app_surfaces.dart';
-import '../../shared/components/care_sheets.dart';
 import '../../shared/components/empty_state.dart';
 import '../../shared/components/headers.dart';
-import '../../shared/components/list_rows.dart';
 import '../../shared/components/metric_card.dart';
 import '../../shared/components/pressable.dart';
+import '../../shared/widgets/health_ring.dart';
 import '../../shared/widgets/pg_icon.dart';
 import '../../shared/widgets/plant_artwork.dart';
 import '../../shared/widgets/skeleton.dart';
 import '../../stores/app_shell_store.dart';
-import '../../domain/models/care_task.dart';
 import '../../stores/insights_store.dart';
 import '../../stores/notifications_store.dart';
 import '../../stores/plant_collection_store.dart';
@@ -25,12 +25,16 @@ import '../../theme.dart';
 import '../../utils/date_format.dart';
 import '../shell/app_shell.dart';
 import 'home_attention_card.dart';
+import 'home_care_card.dart';
 import 'home_environment_card.dart';
 
 /// The home dashboard: who is looking, what needs attention, today's care and
 /// the ambient reading.
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
+
+  /// Needs attention shows the most urgent few; "See all" has the rest.
+  static const int _attentionFold = 3;
 
   @override
   Widget build(BuildContext context) {
@@ -40,9 +44,10 @@ class HomeScreen extends StatelessWidget {
     final profile = locator<ProfileStore>();
 
     return ScreenBackground(
-      glowAlignment: const Alignment(0.35, -0.98),
-      glowRadius: 0.75,
+      glowAlignment: const Alignment(0, -1.0),
+      glowRadius: 0.8,
       glowOpacity: 0.85,
+      bottomGlow: true,
       child: SafeArea(
         bottom: false,
         child: RefreshIndicator(
@@ -56,6 +61,12 @@ class HomeScreen extends StatelessWidget {
           },
           child: Observer(
             builder: (context) {
+              // The day folded by kind — four rows at most, however many
+              // plants want something. The full list is a tap away.
+              final care = summariseToday(
+                collection.tasks,
+                (id) => collection.plantById(id)?.nickname,
+              );
               return CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(
                   parent: BouncingScrollPhysics(),
@@ -76,13 +87,23 @@ class HomeScreen extends StatelessWidget {
                           temperature: insights.weather?.temperatureC,
                           unread: notifications.unreadCount,
                         ),
-                        const SizedBox(height: AppSpacing.xxl),
-                        const Text('My Plants', style: AppText.display40),
-                        const SizedBox(height: AppSpacing.sm),
-                        _AttentionSummary(
-                          count: collection.attentionCount,
-                          city: insights.city,
-                          loading: collection.isLoading,
+                        const SizedBox(height: AppSpacing.lg),
+                        _CollectionHeader(
+                          attentionCount: collection.attentionCount,
+                          // Null when there is no reading, rather than the
+                          // store's '—' placeholder.
+                          city: insights.weather?.city,
+                          averageHealth: collection.averageHealth,
+                          // First load only: a refresh keeps what is shown.
+                          loading: collection.isLoading &&
+                              collection.plants.isEmpty,
+                          // An empty collection has its own empty state.
+                          showRing: collection.plants.isNotEmpty ||
+                              collection.isLoading,
+                          onOpenHealth: () {
+                            collection.setFilter(PlantFilter.all);
+                            locator<AppShellStore>().select(1);
+                          },
                         ),
                       ],
                     ),
@@ -91,7 +112,7 @@ class HomeScreen extends StatelessWidget {
                     const SliverPadding(
                       padding: EdgeInsets.fromLTRB(
                         AppSpacing.gutter,
-                        AppSpacing.section,
+                        AppSpacing.xxl,
                         AppSpacing.gutter,
                         0,
                       ),
@@ -116,10 +137,10 @@ class HomeScreen extends StatelessWidget {
                           primaryIcon: PgIcons.scan,
                           onPrimary: () =>
                               Navigator.of(context).pushNamed(AppRoutes.scan),
-                          secondaryLabel: 'Browse the Pokedex',
+                          secondaryLabel: 'Browse the Plantdex',
                           onSecondary: () => Navigator.of(
                             context,
-                          ).pushNamed(AppRoutes.pokedex),
+                          ).pushNamed(AppRoutes.plantdex),
                         ),
                       ),
                     )
@@ -128,9 +149,9 @@ class HomeScreen extends StatelessWidget {
                       SliverPadding(
                         padding: const EdgeInsets.fromLTRB(
                           AppSpacing.gutter,
-                          AppSpacing.section,
+                          AppSpacing.xxl,
                           AppSpacing.gutter,
-                          AppSpacing.lg,
+                          AppSpacing.md,
                         ),
                         sliver: SliverToBoxAdapter(
                           child: SectionHeader(
@@ -148,9 +169,12 @@ class HomeScreen extends StatelessWidget {
                           horizontal: AppSpacing.gutter,
                         ),
                         sliver: SliverList.separated(
-                          itemCount: collection.needsAttention.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: AppSpacing.md),
+                          itemCount: math.min(
+                            collection.needsAttention.length,
+                            _attentionFold,
+                          ),
+                          separatorBuilder: (_, _) =>
+                              const SizedBox(height: AppSpacing.sm),
                           itemBuilder: (context, index) => Entrance(
                             index: index,
                             child: HomeAttentionCard(
@@ -164,86 +188,48 @@ class HomeScreen extends StatelessWidget {
                       const SliverPadding(
                         padding: EdgeInsets.fromLTRB(
                           AppSpacing.gutter,
-                          AppSpacing.section,
+                          AppSpacing.xxl,
                           AppSpacing.gutter,
                           0,
                         ),
                         sliver: SliverToBoxAdapter(child: _AllCaughtUpCard()),
                       ),
-                    // With nothing scheduled the header would read
-                    // "0 of 0 done" above an empty space.
-                    if (collection.tasks.isNotEmpty)
+                    // With nothing scheduled there is no day to fold.
+                    if (care.isNotEmpty) ...[
                       SliverPadding(
                         padding: const EdgeInsets.fromLTRB(
                           AppSpacing.gutter,
-                          AppSpacing.section,
+                          AppSpacing.xxl,
                           AppSpacing.gutter,
-                          AppSpacing.lg,
+                          AppSpacing.md,
                         ),
                         sliver: SliverToBoxAdapter(
                           child: SectionHeader(
                             title: "Today's care",
-                            trailing:
-                                '${collection.doneTaskCount} of ${collection.tasks.length} done',
+                            trailing: 'View all',
+                            onTrailingTap: () => Navigator.of(context)
+                                .pushNamed(AppRoutes.todaysCare),
                           ),
                         ),
                       ),
-                    SliverPadding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.gutter,
+                      SliverPadding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.gutter,
+                        ),
+                        sliver: SliverToBoxAdapter(
+                          child: TodayCareCard(
+                            summaries: care,
+                            onOpenKind: (kind) => Navigator.of(context)
+                                .pushNamed(AppRoutes.todaysCare,
+                                    arguments: kind),
+                          ),
+                        ),
                       ),
-                      sliver: SliverList.separated(
-                        itemCount: collection.tasks.length,
-                        separatorBuilder: (_, __) =>
-                            const SizedBox(height: AppSpacing.md),
-                        itemBuilder: (context, index) {
-                          final task = collection.tasks[index];
-                          // Steps arrive grouped by plan; a heading marks
-                          // where each plan's steps start.
-                          final startsPlan =
-                              task.kind == CareTaskKind.treatmentStep &&
-                              task.courseId != null &&
-                              (index == 0 ||
-                                  collection.tasks[index - 1].courseId !=
-                                      task.courseId);
-                          return Entrance(
-                            index: index,
-                            child: _CareTaskRow(
-                              task: task,
-                              planHeading: startsPlan
-                                  ? 'Treatment plan · '
-                                        '${collection.plantById(task.plantId)?.nickname ?? 'your plant'}'
-                                  : null,
-                              onToggle: () => collection.completeTask(task.id),
-                              onSkip: task.skippable
-                                  ? () => showSkipStepSheet(context, task)
-                                  : null,
-                              onOpen: () {
-                                final plant = collection.plantById(
-                                  task.plantId,
-                                );
-                                if (plant == null) return;
-                                if (task.kind == CareTaskKind.condition) {
-                                  Navigator.of(context).pushNamed(
-                                    AppRoutes.conditionUpdate,
-                                    arguments: plant,
-                                  );
-                                } else {
-                                  Navigator.of(context).pushNamed(
-                                    AppRoutes.plantDetail,
-                                    arguments: plant,
-                                  );
-                                }
-                              },
-                            ),
-                          );
-                        },
-                      ),
-                    ),
+                    ],
                     SliverPadding(
                       padding: const EdgeInsets.fromLTRB(
                         AppSpacing.gutter,
-                        AppSpacing.section,
+                        AppSpacing.xxl,
                         AppSpacing.gutter,
                         0,
                       ),
@@ -288,8 +274,8 @@ class _GreetingRow extends StatelessWidget {
     return Row(
       children: [
         Container(
-          width: 46,
-          height: 46,
+          width: 40,
+          height: 40,
           alignment: Alignment.center,
           decoration: const BoxDecoration(
             shape: BoxShape.circle,
@@ -301,7 +287,7 @@ class _GreetingRow extends StatelessWidget {
           ),
           child: Text(
             initial,
-            style: AppText.heading20.copyWith(fontSize: 18.5),
+            style: AppText.heading20.copyWith(fontSize: 16),
           ),
         ),
         const SizedBox(width: AppSpacing.md),
@@ -311,16 +297,24 @@ class _GreetingRow extends StatelessWidget {
             children: [
               Text(
                 AppDate.greeting(),
-                style: AppText.body15.copyWith(fontSize: 15),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppText.body15.copyWith(fontSize: 13.5),
               ),
-              Text(name, style: AppText.heading20.copyWith(fontSize: 18.5)),
+              // One line, so a long name cannot make the header taller.
+              Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppText.heading20.copyWith(fontSize: 17),
+              ),
             ],
           ),
         ),
         if (temperature != null)
           Container(
-            height: 48,
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+            height: 40,
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
             decoration: const BoxDecoration(
               color: AppColors.surface,
               borderRadius: AppRadius.pillR,
@@ -330,13 +324,13 @@ class _GreetingRow extends StatelessWidget {
               children: [
                 const PgIcon(
                   PgIcons.sun,
-                  size: 21,
+                  size: 18,
                   color: AppColors.cautionDeep,
                 ),
-                const SizedBox(width: AppSpacing.sm),
+                const SizedBox(width: AppSpacing.xs),
                 Text(
                   '$temperature°',
-                  style: AppText.heading17.copyWith(fontSize: 16.5),
+                  style: AppText.heading17.copyWith(fontSize: 15),
                 ),
               ],
             ),
@@ -347,28 +341,183 @@ class _GreetingRow extends StatelessWidget {
           children: [
             CircleIconButton(
               icon: PgIcons.bell,
-              size: 48,
+              size: 42,
               onPressed: () =>
                   Navigator.of(context).pushNamed(AppRoutes.notifications),
-              semanticLabel: 'Notifications',
+              semanticLabel:
+                  unread > 0 ? 'Notifications, $unread unread' : 'Notifications',
             ),
             if (unread > 0)
               Positioned(
-                top: 9,
-                right: 10,
-                child: Container(
-                  width: 11,
-                  height: 11,
-                  decoration: BoxDecoration(
-                    color: AppColors.leaf,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.surface, width: 2),
+                top: 7,
+                right: 8,
+                child: IgnorePointer(
+                  child: Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: AppColors.leaf,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.surface, width: 2),
+                    ),
                   ),
                 ),
               ),
           ],
         ),
       ],
+    );
+  }
+}
+
+/// "My Plants" and what wants attention on the left; the collection's
+/// average health on the right, so the block under the greeting carries
+/// weight on both sides — the ring sits under the bell, on the same edge.
+/// It is no taller than the two lines beside it, so the header keeps its
+/// height.
+class _CollectionHeader extends StatelessWidget {
+  const _CollectionHeader({
+    required this.attentionCount,
+    required this.city,
+    required this.averageHealth,
+    required this.loading,
+    required this.showRing,
+    required this.onOpenHealth,
+  });
+
+  final int attentionCount;
+  final String? city;
+  final int? averageHealth;
+  final bool loading;
+  final bool showRing;
+  final VoidCallback onOpenHealth;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('My Plants',
+                  style: AppText.display40.copyWith(fontSize: 32)),
+              const SizedBox(height: AppSpacing.xs),
+              _AttentionSummary(
+                count: attentionCount,
+                city: city,
+                loading: loading,
+              ),
+            ],
+          ),
+        ),
+        if (showRing) ...[
+          const SizedBox(width: AppSpacing.lg),
+          _CollectionHealthRing(
+            score: averageHealth,
+            loading: loading,
+            onTap: onOpenHealth,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// The collection's average health on a white disc, drawn with the plant
+/// page's own ring. The number takes its band's deep colour, as the score
+/// badge on the plant cards does.
+///
+/// `null` means no plant under care has been scored yet: the ring is the
+/// beaded "not scored" one with a camera, as on an unscored plant's page —
+/// never a 0. Tapping opens My Plants; a long press says what the number is.
+class _CollectionHealthRing extends StatelessWidget {
+  const _CollectionHealthRing({
+    required this.score,
+    required this.loading,
+    required this.onTap,
+  });
+
+  /// The height of the title and attention lines beside it.
+  static const double _size = 60;
+  static const double _inset = 4;
+  static const double _stroke = 5;
+
+  final int? score;
+  final bool loading;
+  final VoidCallback onTap;
+
+  static Color _numberColor(int score) =>
+      switch (HealthBandX.fromScore(score)) {
+        HealthBand.thriving => AppColors.healthyDeep,
+        HealthBand.watch => AppColors.cautionDeep,
+        HealthBand.critical => AppColors.criticalDeep,
+        null => AppColors.inkMuted,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    // One pixel down puts the ring's centre on the two lines' ink centre.
+    return Padding(
+      padding: const EdgeInsets.only(top: 1),
+      child: loading ? const Skeleton.circle(size: _size) : _ring(),
+    );
+  }
+
+  Widget _ring() {
+    final s = score;
+    return Tooltip(
+      message: s == null
+          ? 'Not scored yet — a check-in photo scores a plant'
+          : 'Average plant health',
+      excludeFromSemantics: true,
+      child: Pressable(
+        onTap: onTap,
+        scale: 0.94,
+        semanticLabel: s == null
+            ? 'Average plant health, not scored yet'
+            : 'Average plant health $s',
+        child: ExcludeSemantics(
+          child: Container(
+            width: _size,
+            height: _size,
+            padding: const EdgeInsets.all(_inset),
+            decoration: const BoxDecoration(
+              color: AppColors.surface,
+              shape: BoxShape.circle,
+              boxShadow: AppShadows.raised,
+            ),
+            child: HealthRing(
+              score: s,
+              size: _size - _inset * 2,
+              strokeWidth: _stroke,
+              // Kept inside the stroke, and scaled down rather than clipped
+              // when large text or a 100 would reach the arc.
+              child: Padding(
+                padding: const EdgeInsets.all(_stroke + 3),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: s == null
+                      ? const PgIcon(
+                          PgIcons.camera,
+                          size: 18,
+                          color: AppColors.inkMuted,
+                        )
+                      : AnimatedScore(
+                          value: s,
+                          style: AppText.metric.copyWith(
+                            fontSize: s >= 100 ? 17 : 19,
+                            letterSpacing: -0.6,
+                            color: _numberColor(s),
+                          ),
+                        ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -381,195 +530,97 @@ class _AttentionSummary extends StatelessWidget {
   });
 
   final int count;
-  final String city;
+
+  /// Null or blank when no place is known; the line then ends at the count
+  /// instead of reading "· —".
+  final String? city;
   final bool loading;
+
+  static String? _knownPlace(String? city) {
+    final c = city?.trim();
+    if (c == null || c.isEmpty || c == '—') return null;
+    return c;
+  }
+
+  TextSpan _line(String? place) => TextSpan(
+        // Even leading centres the status dot on the text.
+        style: AppText.body15.copyWith(
+          fontSize: 16,
+          leadingDistribution: TextLeadingDistribution.even,
+        ),
+        children: [
+          if (count == 0)
+            const TextSpan(
+              text: 'Nothing needs attention',
+              style: TextStyle(
+                color: AppColors.ink,
+                fontWeight: FontWeight.w500,
+              ),
+            )
+          else ...[
+            TextSpan(
+              text: '$count plant${count == 1 ? '' : 's'}',
+              style: const TextStyle(
+                color: AppColors.ink,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            TextSpan(text: ' need${count == 1 ? 's' : ''} attention'),
+          ],
+          if (place != null) TextSpan(text: ' · $place'),
+        ],
+      );
+
+  static bool _fits(BuildContext context, TextSpan line, double width) {
+    final painter = TextPainter(
+      text: TextSpan(
+        style: DefaultTextStyle.of(context).style,
+        children: [line],
+      ),
+      maxLines: 1,
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+    )..layout(maxWidth: width);
+    final fits = !painter.didExceedMaxLines;
+    painter.dispose();
+    return fits;
+  }
 
   @override
   Widget build(BuildContext context) {
     if (loading) return const Skeleton(width: 220, height: 16);
+    final place = _knownPlace(city);
     return Row(
       children: [
         Container(
           width: 10,
           height: 10,
           decoration: BoxDecoration(
-            color: count == 0 ? const Color(0xFF3E9B49) : AppColors.caution,
+            color: count == 0 ? AppColors.leaf : AppColors.caution,
             shape: BoxShape.circle,
           ),
         ),
         const SizedBox(width: AppSpacing.md),
         Expanded(
-          child: Text.rich(
-            TextSpan(
-              style: AppText.body15.copyWith(fontSize: 16),
-              children: [
-                if (count == 0)
-                  const TextSpan(
-                    text: 'Nothing needs attention',
-                    style: TextStyle(
-                      color: AppColors.ink,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  )
-                else ...[
-                  TextSpan(
-                    text: '$count plant${count == 1 ? '' : 's'}',
-                    style: const TextStyle(
-                      color: AppColors.ink,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const TextSpan(text: ' need attention'),
-                ],
-                TextSpan(text: ' · $city'),
-              ],
-            ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // The ring takes the right edge, so the line has less room.
+              // The place goes first rather than being cut mid-word; the
+              // count always stays.
+              var line = _line(place);
+              if (place != null &&
+                  !_fits(context, line, constraints.maxWidth)) {
+                line = _line(null);
+              }
+              return Text.rich(
+                line,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              );
+            },
           ),
         ),
       ],
-    );
-  }
-}
-
-/// One of today's tasks. Four kinds share the row; a kind this build does
-/// not know still shows its own title and detail and can be completed.
-class _CareTaskRow extends StatelessWidget {
-  const _CareTaskRow({
-    required this.task,
-    required this.onToggle,
-    required this.onOpen,
-    this.onSkip,
-    this.planHeading,
-  });
-
-  final CareTask task;
-  final VoidCallback onToggle;
-  final VoidCallback onOpen;
-
-  /// Only a treatment step can be skipped.
-  final VoidCallback? onSkip;
-
-  /// Set on the first step of each plan, so the list reads in groups.
-  final String? planHeading;
-
-  @override
-  Widget build(BuildContext context) {
-    final heading = planHeading;
-    if (heading != null) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(
-                left: AppSpacing.xs, bottom: AppSpacing.sm),
-            child: CaptionLabel(heading, color: AppColors.healthyDeep),
-          ),
-          _CareTaskRow(
-            task: task,
-            onToggle: onToggle,
-            onOpen: onOpen,
-            onSkip: onSkip,
-          ),
-        ],
-      );
-    }
-
-    final done = task.done;
-    final kind = task.kind;
-    final overdue = task.overdue;
-    // A step says which problem it serves; "All problems" is one shared
-    // instruction, shown once.
-    final detail = task.problem == null || task.problem!.isEmpty
-        ? task.detail
-        : '${task.problem} · ${task.detail}';
-    final (icon, tint, deep) = switch (kind) {
-      CareTaskKind.watering => (
-          PgIcons.droplet,
-          AppColors.waterTint,
-          AppColors.waterDeep
-        ),
-      CareTaskKind.condition => (
-          PgIcons.camera,
-          AppColors.cautionTint,
-          AppColors.cautionDeep
-        ),
-      CareTaskKind.treatmentStep => (
-          PgIcons.leaf,
-          AppColors.leafSoft,
-          AppColors.healthyDeep
-        ),
-      CareTaskKind.environment => (
-          PgIcons.thermometer,
-          AppColors.neutralTint,
-          AppColors.inkMuted
-        ),
-      CareTaskKind.unknown => (
-          PgIcons.calendar,
-          AppColors.neutralTint,
-          AppColors.inkMuted
-        ),
-    };
-
-    return TileRow(
-      icon: icon,
-      title: task.title,
-      detail: detail,
-      strikeThrough: done,
-      background: done ? const Color(0xFFF7FAF9) : AppColors.surface,
-      elevated: !done,
-      detailColor: overdue ? AppColors.cautionDeep : null,
-      iconBackground: done ? AppColors.softGreen : tint,
-      iconForeground: done ? AppColors.healthyDeep : deep,
-      leading: done
-          ? Container(
-              width: 52,
-              height: 52,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: AppColors.softGreen,
-                borderRadius: BorderRadius.circular(AppRadius.tile),
-              ),
-              child: const PgIcon(
-                PgIcons.check,
-                size: 24,
-                color: AppColors.healthyDeep,
-              ),
-            )
-          : null,
-      onTap: done
-          ? null
-          : onSkip != null
-              ? () => showTaskActions(context, task,
-                  onComplete: onToggle, onSkip: onSkip!)
-              : onOpen,
-      trailing: done
-          ? null
-          : kind == CareTaskKind.condition
-          ? CircleIconButton(
-              icon: PgIcons.chevronRight,
-              size: 46,
-              background: AppColors.ink,
-              foreground: AppColors.leaf,
-              elevated: false,
-              onPressed: onOpen,
-            )
-          : Pressable(
-              onTap: onToggle,
-              scale: 0.9,
-              child: Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.line, width: 1.6),
-                ),
-                child: const PgIcon(
-                  PgIcons.check,
-                  size: 22,
-                  color: AppColors.inkMuted,
-                ),
-              ),
-            ),
     );
   }
 }
@@ -580,7 +631,7 @@ class _AllCaughtUpCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 172,
+      height: 104,
       decoration: BoxDecoration(
         color: const Color(0xFFA9D183),
         borderRadius: BorderRadius.circular(AppRadius.card),
@@ -590,10 +641,10 @@ class _AllCaughtUpCard extends StatelessWidget {
       child: Stack(
         children: [
           const Positioned(
-            right: -30,
-            bottom: -40,
-            width: 200,
-            height: 200,
+            right: -26,
+            bottom: -34,
+            width: 140,
+            height: 140,
             child: PlantArtwork(
               glyph: PlantGlyph.pothos,
               showGround: false,
@@ -602,37 +653,48 @@ class _AllCaughtUpCard extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(AppSpacing.cardPadding),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Row(
               children: [
                 Container(
-                  width: 48,
-                  height: 48,
+                  width: 44,
+                  height: 44,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: AppColors.ink,
-                    borderRadius: BorderRadius.circular(16),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
                   ),
                   child: const PgIcon(
                     PgIcons.check,
-                    size: 24,
-                    color: AppColors.leaf,
+                    size: 22,
+                    color: AppColors.healthyDeep,
                   ),
                 ),
-                const Spacer(),
-                Text(
-                  'All caught up',
-                  style: AppText.title28.copyWith(fontSize: 24),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  'Every plant is watered and checked in.',
-                  style: AppText.body15.copyWith(
-                    fontSize: 15,
-                    color: const Color(0xFF243517),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'All caught up',
+                        style: AppText.title28.copyWith(fontSize: 20),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Every plant is watered and checked in.',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.body15.copyWith(
+                          fontSize: 14,
+                          color: const Color(0xFF243517),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+                // Room for the artwork peeking in from the corner.
+                const SizedBox(width: 56),
               ],
             ),
           ),
@@ -653,7 +715,7 @@ class _HomeSkeleton extends StatelessWidget {
         Skeleton(width: 180, height: 22),
         SizedBox(height: AppSpacing.lg),
         Skeleton(height: 242, radius: AppRadius.card),
-        SizedBox(height: AppSpacing.section),
+        SizedBox(height: AppSpacing.xxl),
         Skeleton(width: 150, height: 22),
         SizedBox(height: AppSpacing.lg),
         Skeleton(height: 84, radius: AppRadius.card),

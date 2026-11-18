@@ -11,7 +11,7 @@ import '../../shared/components/headers.dart';
 import '../../shared/services/capture_service.dart';
 import '../../shared/widgets/live_viewfinder.dart';
 import '../../shared/widgets/pg_icon.dart';
-import '../../stores/pokedex_store.dart';
+import '../../stores/plantdex_store.dart';
 import '../../stores/scanning_store.dart';
 import '../../theme.dart';
 
@@ -81,7 +81,7 @@ class _ScanScreenState extends State<ScanScreen> {
         },
         onSearch: () {
           Navigator.of(sheetContext).pop();
-          Navigator.of(context).pushReplacementNamed(AppRoutes.pokedex);
+          Navigator.of(context).pushReplacementNamed(AppRoutes.plantdex);
         },
         onSettings: () {
           Navigator.of(sheetContext).pop();
@@ -209,10 +209,10 @@ class _ScanScreenState extends State<ScanScreen> {
                             ViewfinderAction(
                               icon: PgIcons.search,
                               onTap: () {
-                                locator<PokedexStore>().clearFilters();
+                                locator<PlantdexStore>().clearFilters();
                                 Navigator.of(
                                   context,
-                                ).pushReplacementNamed(AppRoutes.pokedex);
+                                ).pushReplacementNamed(AppRoutes.plantdex);
                               },
                               semanticLabel: 'Search manually',
                             ),

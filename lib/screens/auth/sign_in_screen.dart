@@ -21,8 +21,8 @@ class SignInScreen extends StatefulWidget {
 }
 
 class _SignInScreenState extends State<SignInScreen> {
-  final _email = TextEditingController();
-  final _password = TextEditingController();
+  final _email = TextEditingController(text: "rayan.krishna@sqing.in");
+  final _password = TextEditingController(text: "password");
   final AuthStore _store = locator<AuthStore>();
 
   @override

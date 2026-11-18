@@ -37,13 +37,6 @@ mixin _$ProfileStore on _ProfileStore, Store {
     () => super.initial,
     name: '_ProfileStore.initial',
   )).value;
-  Computed<String>? _$cityComputed;
-
-  @override
-  String get city => (_$cityComputed ??= Computed<String>(
-    () => super.city,
-    name: '_ProfileStore.city',
-  )).value;
   Computed<int>? _$plantsKeptComputed;
 
   @override
@@ -72,27 +65,6 @@ mixin _$ProfileStore on _ProfileStore, Store {
     () => super.careStreakWeeks,
     name: '_ProfileStore.careStreakWeeks',
   )).value;
-  Computed<String>? _$streakSinceComputed;
-
-  @override
-  String get streakSince => (_$streakSinceComputed ??= Computed<String>(
-    () => super.streakSince,
-    name: '_ProfileStore.streakSince',
-  )).value;
-  Computed<String>? _$reminderTimeComputed;
-
-  @override
-  String get reminderTime => (_$reminderTimeComputed ??= Computed<String>(
-    () => super.reminderTime,
-    name: '_ProfileStore.reminderTime',
-  )).value;
-  Computed<String>? _$unitsComputed;
-
-  @override
-  String get units => (_$unitsComputed ??= Computed<String>(
-    () => super.units,
-    name: '_ProfileStore.units',
-  )).value;
 
   late final _$signOutAsyncAction = AsyncAction(
     '_ProfileStore.signOut',
@@ -111,14 +83,10 @@ profile: ${profile},
 name: ${name},
 email: ${email},
 initial: ${initial},
-city: ${city},
 plantsKept: ${plantsKept},
 underActiveCare: ${underActiveCare},
 averageHealth: ${averageHealth},
-careStreakWeeks: ${careStreakWeeks},
-streakSince: ${streakSince},
-reminderTime: ${reminderTime},
-units: ${units}
+careStreakWeeks: ${careStreakWeeks}
     ''';
   }
 }

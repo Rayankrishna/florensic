@@ -40,6 +40,7 @@ class _PlantsScreenState extends State<PlantsScreen> {
   Widget build(BuildContext context) {
     return ScreenBackground(
       glow: false,
+      bottomGlow: true,
       child: SafeArea(
         bottom: false,
         child: Observer(
@@ -60,7 +61,7 @@ class _PlantsScreenState extends State<PlantsScreen> {
               return _EmptyCollection(
                 onScan: () => Navigator.of(context).pushNamed(AppRoutes.scan),
                 onBrowse: () =>
-                    Navigator.of(context).pushNamed(AppRoutes.pokedex),
+                    Navigator.of(context).pushNamed(AppRoutes.plantdex),
               );
             }
 
@@ -299,7 +300,7 @@ class _EmptyCollection extends StatelessWidget {
           primaryLabel: 'Add your first plant',
           primaryIcon: PgIcons.scan,
           onPrimary: onScan,
-          secondaryLabel: 'Browse the Pokedex',
+          secondaryLabel: 'Browse the Plantdex',
           onSecondary: onBrowse,
         ),
       ],

@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 
 import 'domain/models/plant.dart';
 import 'domain/models/plant_species.dart';
+import 'enum.dart';
 import 'locator.dart';
 import 'screens/auth/auth_landing_screen.dart';
 import 'screens/auth/sign_in_screen.dart';
 import 'screens/auth/sign_up_screen.dart';
 import 'screens/auth/verify_code_screen.dart';
+import 'screens/home/todays_care_screen.dart';
 import 'screens/insights/insights_screen.dart';
 import 'screens/notifications/notifications_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
@@ -16,13 +18,14 @@ import 'screens/plants/condition_confirmed_screen.dart';
 import 'screens/plants/condition_update_screen.dart';
 import 'screens/plants/plant_detail_screen.dart';
 import 'screens/plants/treatments_screen.dart';
-import 'screens/pokedex/pokedex_screen.dart';
-import 'screens/pokedex/species_detail_screen.dart';
+import 'screens/plantdex/plantdex_screen.dart';
+import 'screens/plantdex/species_detail_screen.dart';
 import 'screens/scanning/scan_result_screen.dart';
 import 'screens/scanning/scan_screen.dart';
 import 'screens/scanning/species_search_screen.dart';
 import 'screens/shell/app_shell.dart';
 import 'screens/splash/splash_screen.dart';
+import 'shared/widgets/photo_viewer.dart';
 import 'stores/condition_update_store.dart';
 import 'stores/permissions_store.dart';
 import 'stores/plant_detail_store.dart';
@@ -36,6 +39,11 @@ import 'utils/page_transitions.dart';
 class AppRoutes {
   const AppRoutes._();
 
+  /// The root navigator, for what happens with no screen of its own — a
+  /// session ending under the keeper's feet.
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>();
+
   static const String splash = '/';
   static const String authLanding = '/auth';
   static const String signIn = '/auth/sign-in';
@@ -44,13 +52,15 @@ class AppRoutes {
   static const String onboarding = '/onboarding';
   static const String permissions = '/permissions';
   static const String shell = '/home';
+  static const String todaysCare = '/home/care';
   static const String plantDetail = '/plant';
   static const String careSchedule = '/plant/schedule';
   static const String conditionUpdate = '/plant/condition';
   static const String conditionConfirmed = '/plant/condition/done';
   static const String treatments = '/plant/treatments';
-  static const String pokedex = '/pokedex';
-  static const String speciesDetail = '/pokedex/species';
+  static const String photos = '/photos';
+  static const String plantdex = '/plantdex';
+  static const String speciesDetail = '/plantdex/species';
   static const String scan = '/scan';
   static const String scanResult = '/scan/result';
   static const String speciesSearch = '/scan/species';
@@ -91,6 +101,12 @@ class AppRoutes {
       case shell:
         return AppTransitions.fade(const AppShell(), settings);
 
+      case todaysCare:
+        return AppTransitions.glide(
+          TodaysCareScreen(initialKind: args as CareTaskKind?),
+          settings,
+        );
+
       case plantDetail:
         return AppTransitions.glide(
           PlantDetailScreen(plant: args! as Plant),
@@ -122,9 +138,20 @@ class AppRoutes {
           settings,
         );
 
-      case pokedex:
+      case plantdex:
         return AppTransitions.glide(
-          const PokedexScreen(embedded: true),
+          const PlantdexScreen(embedded: true),
+          settings,
+        );
+
+      case photos:
+        final viewer = args! as PhotoViewerArgs;
+        return AppTransitions.photo(
+          PhotoViewerScreen(
+            photos: viewer.photos,
+            initialIndex: viewer.initialIndex,
+            partnerTags: viewer.partnerTags,
+          ),
           settings,
         );
 

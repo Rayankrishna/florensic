@@ -11,7 +11,10 @@ import 'pg_icon.dart';
 /// giving the surface its edge.
 ///
 /// Five destinations; the third is the scan action and opens a full-screen
-/// route rather than a tab, so it is drawn as a filled ink disc.
+/// route rather than a tab, so it is drawn as a filled leaf disc — the one
+/// saturated element in the bar. The selected tab sits on a solid white
+/// disc with a deep-green glyph, which stays legible over the page's green
+/// glow where a pale tint would vanish; no ink in the bar.
 class AppBottomNav extends StatelessWidget {
   const AppBottomNav({
     super.key,
@@ -138,11 +141,11 @@ class _NavItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final double diameter = isScan ? 58 : 46;
     final Color background = isScan
-        ? AppColors.ink
-        : (selected ? AppColors.leaf : Colors.transparent);
+        ? AppColors.leaf
+        : (selected ? AppColors.surface : Colors.transparent);
     final Color foreground = isScan
         ? Colors.white
-        : (selected ? AppColors.ink : AppColors.inkMuted);
+        : (selected ? AppColors.healthyDeep : AppColors.inkMuted);
 
     return Semantics(
       button: true,
